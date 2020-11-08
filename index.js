@@ -369,7 +369,7 @@ function play() {
         view = new Viewport(canvas, maze);
         view.offsetX = SETTINGS.cellSize;
         view.offsetY = SETTINGS.cellSize;
-        view.drawAll();
+        requestAnimationFrame(redraw);
         SOUND.background.loop = true;
         SOUND.background.play();
     }
@@ -383,6 +383,10 @@ function play() {
             animation = null;
         }
     }
+
+    function redraw(timestamp) {
+        view.drawAll(timestamp);
+    } 
 
     function processKeyDown(e) {
         switch (e.key) {
@@ -433,7 +437,7 @@ function play() {
                 return;
             }
             maze.items[i][j] = item ? null : new Treasure();
-            view.drawAll();
+            requestAnimationFrame(redraw);
             return;
         }
         if (dx > dy) {
@@ -443,7 +447,7 @@ function play() {
                 }
             } else {
                 if (j < maze.width - 1) {
-                    maze.verWalls[i][j + 1] = !maze.horWalls[i][j + 1];
+                    maze.verWalls[i][j + 1] = !maze.verWalls[i][j + 1];
                 }
             }
         } else {
@@ -458,7 +462,7 @@ function play() {
             }
             
         }
-        view.drawAll();
+        requestAnimationFrame(redraw);
     }
 
     document.addEventListener('keydown', processKeyDown);
