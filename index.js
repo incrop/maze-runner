@@ -3,17 +3,26 @@
 const SETTINGS = {
     cellSize: 120,
     wallWidth: 5,
-    bgColor: '#333333',
+    bgColor: '#444444',
     wallColor: '#ffdb4d',
     diamondColor: '#33ccff',
     playerColor: '#ff3300',
-    moveTimeMs: 300, 
+    moveTimeMs: 500, 
+    spriteTimeMs: 100, 
 };
 
 const params = new URLSearchParams(window.location.search);
 const WIDTH = parseInt(params.get('w'), 10) || 13;
 const HEIGHT = parseInt(params.get('h'), 10) || 6;
 const DENSITY = parseInt(params.get('d'), 10) || 10;
+
+const SPRITES = {
+    onload: play
+}
+SPRITES.ArrowDown = loadSprites('img/finn.svg', 'img/finn.svg');
+SPRITES.ArrowLeft = loadSprites('img/finn-left.svg', 'img/finn-left.svg');
+SPRITES.ArrowUp = loadSprites('img/finn.svg', 'img/finn.svg');
+SPRITES.ArrowRight = loadSprites('img/finn.svg', 'img/finn.svg');
 
 class Player {
     constructor(i, j) {
@@ -24,11 +33,13 @@ class Player {
     }
     draw(timestamp, ctx, x, y) {
         const center = Math.floor(SETTINGS.cellSize / 2);
-        const size = Math.floor(SETTINGS.cellSize / 4);
+        const size = Math.floor(SETTINGS.cellSize * 0.4);
         x += center;
         y += center;
+        let spriteIdx = 0;
         if (this.moveStart) {
-            const offset = Math.min(SETTINGS.cellSize, Math.floor(SETTINGS.cellSize * (timestamp - this.moveStart) / SETTINGS.moveTimeMs));
+            const elapsed = timestamp - this.moveStart;
+            const offset = Math.min(SETTINGS.cellSize, Math.floor(SETTINGS.cellSize * elapsed / SETTINGS.moveTimeMs));
             switch (this.direction) {
                 case 'ArrowDown':
                     y += offset;
@@ -43,24 +54,10 @@ class Player {
                     x += offset;
                     break;
             }
+            const spriteInterval = Math.floor(elapsed / SETTINGS.spriteTimeMs);
+            spriteIdx = (spriteInterval % (SPRITES[this.direction].length - 1)) + 1
         }
-        ctx.fillStyle = SETTINGS.playerColor;
-        ctx.beginPath();
-        const ra = this._rotateAngle()
-        ctx.arc(x, y, size, ra, ra + Math.PI);
-        ctx.fill(); 
-    }
-    _rotateAngle() {
-        switch (this.direction) {
-            case 'ArrowDown':
-                return 0;
-            case 'ArrowLeft':
-                return Math.PI / 2;
-            case 'ArrowUp':
-                return Math.PI;
-            case 'ArrowRight':
-                return Math.PI * 3 / 2;
-        }
+        ctx.drawImage(SPRITES[this.direction][spriteIdx], x + size, y + size, -2 * size, -2 * size);
     }
 }
 
@@ -123,7 +120,6 @@ class Maze {
         for (const direction of directions) {
             this.player.direction = direction;
             if (this.canMove(direction)) {
-                
                 return true;
             }
         }
@@ -285,48 +281,64 @@ function generateDFS(maze) {
     }
 }
 
-
-const maze = new Maze(HEIGHT, WIDTH);
-generateDFS(maze);
-
-const view = new Viewport(document.getElementById('maze'), maze);
-view.offsetX = SETTINGS.cellSize;
-view.offsetY = SETTINGS.cellSize;
-view.draw();
-
-let pressedKeys = {};
-let animation = null;
-
-function moveAnimation(timestamp) {
-    maze.process(timestamp, Object.keys(pressedKeys));
-    view.draw(timestamp);
-    if (maze.isAnimating()) {
-        animation = requestAnimationFrame(moveAnimation);
-    } else {
-        animation = null;
+function loadSprites(...urls) {
+    return urls.map(url => {
+        SPRITES.loadCount = !SPRITES.loadCount ? 1 : SPRITES.loadCount + 1;
+        const img = new Image();
+        img.onload = decLoadCount;
+        img.src = url;
+        return img;
+    });
+    function decLoadCount() {
+        if (--SPRITES.loadCount === 0) {
+            SPRITES.onload();
+        }
     }
 }
 
-function processKeyDown(e) {
-    switch (e.key) {
-        case 'ArrowLeft':
-        case 'ArrowRight':
-        case 'ArrowUp':
-        case 'ArrowDown':
-            break;
-        default:
-            return;
+function play() {
+    const maze = new Maze(HEIGHT, WIDTH);
+    generateDFS(maze);
+
+    const view = new Viewport(document.getElementById('maze'), maze);
+    view.offsetX = SETTINGS.cellSize;
+    view.offsetY = SETTINGS.cellSize;
+    view.draw();
+
+    let pressedKeys = {};
+    let animation = null;
+
+    function moveAnimation(timestamp) {
+        maze.process(timestamp, Object.keys(pressedKeys));
+        view.draw(timestamp);
+        if (maze.isAnimating()) {
+            animation = requestAnimationFrame(moveAnimation);
+        } else {
+            animation = null;
+        }
     }
-    pressedKeys[e.key] = true;
-    if (!animation) {
-        animation = window.requestAnimationFrame(moveAnimation);
+
+    function processKeyDown(e) {
+        switch (e.key) {
+            case 'ArrowLeft':
+            case 'ArrowRight':
+            case 'ArrowUp':
+            case 'ArrowDown':
+                break;
+            default:
+                return;
+        }
+        pressedKeys[e.key] = true;
+        if (!animation) {
+            animation = window.requestAnimationFrame(moveAnimation);
+        }
     }
+
+    function processKeyUp(e) {
+        delete pressedKeys[e.key];
+    }
+
+    document.addEventListener('keydown', processKeyDown);
+    document.addEventListener('keyup', processKeyUp);
+
 }
-
-function processKeyUp(e) {
-    delete pressedKeys[e.key];
-}
-
-document.addEventListener('keydown', processKeyDown);
-document.addEventListener('keyup', processKeyUp);
-
