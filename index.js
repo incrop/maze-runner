@@ -19,12 +19,12 @@ const EDIT_MODE = !!params.get('e');
 const SPRITES = {
     onload: play
 };
-SPRITES.ArrowDown = loadSprites('img/right-stand.svg', 'img/right-move1.svg', 'img/right-move2.svg', 'img/right-move3.svg', 'img/right-move2.svg');
+SPRITES.ArrowDown = loadSprites('img/down-stand.svg', 'img/down-move1.svg', 'img/down-move2.svg');
 SPRITES.ArrowLeft = loadSprites('img/left-stand.svg', 'img/left-move1.svg', 'img/left-move2.svg', 'img/left-move3.svg', 'img/left-move2.svg');
-SPRITES.ArrowUp = loadSprites('img/right-stand.svg', 'img/right-move1.svg', 'img/right-move2.svg', 'img/right-move3.svg', 'img/right-move2.svg');
+SPRITES.ArrowUp = loadSprites('img/up-stand.svg', 'img/up-move1.svg', 'img/up-move2.svg');
 SPRITES.ArrowRight = loadSprites('img/right-stand.svg', 'img/right-move1.svg', 'img/right-move2.svg', 'img/right-move3.svg', 'img/right-move2.svg');
 SPRITES.treasure = loadSprites('img/chest.svg', 'img/gem1.svg', 'img/gem2.svg', 'img/gem3.svg');
-SPRITES.win = loadSprites('img/right-move1.svg', 'img/right-stand.svg', 'img/left-move3.svg', 'img/left-stand.svg');
+SPRITES.win = loadSprites('img/down-stand.svg', 'img/down-cheer.svg');
 
 const SOUND = {
     background: new Audio('sound/background.ogg'),
@@ -160,7 +160,7 @@ class Maze {
             }
             return;
         }
-        this.changedCells.push(p.targetCell());
+        this.changedCells.unshift(p.targetCell());
         if (timestamp - p.moveTimestamp > SETTINGS.moveTimeMs) {
             this.items[p.i][p.j] = null;
             [p.i, p.j] = p.targetCell();
