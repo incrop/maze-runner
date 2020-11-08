@@ -15,6 +15,7 @@ const params = new URLSearchParams(window.location.search);
 const WIDTH = parseInt(params.get('w'), 10) || 13;
 const HEIGHT = parseInt(params.get('h'), 10) || 6;
 const DIAMONDS = parseInt(params.get('d'), 10) || 8;
+const EDIT_MODE = !!params.get('e');
 
 const SPRITES = {
     onload: play
@@ -353,6 +354,7 @@ function loadSprites(...urls) {
 }
 
 function play() {
+    const canvas = document.getElementById('maze');
     let maze;
     let view;
 
@@ -363,8 +365,11 @@ function play() {
 
     function reset() {
         maze = new Maze(HEIGHT, WIDTH);
-        generateDFS(maze);
-        view = new Viewport(document.getElementById('maze'), maze);
+        if (!EDIT_MODE) {
+            generateDFS(maze);
+        }
+        
+        view = new Viewport(canvas, maze);
         view.offsetX = SETTINGS.cellSize;
         view.offsetY = SETTINGS.cellSize;
         view.drawAll();
@@ -411,6 +416,55 @@ function play() {
         delete pressedKeys[e.key];
     }
 
+    function processClick(e) {
+        if (!EDIT_MODE) {
+            return;
+        }
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const i = Math.floor((y - view.offsetY) / SETTINGS.cellSize);
+        const j = Math.floor((x - view.offsetX) / SETTINGS.cellSize);
+        if (i < 0 || i >= maze.height || j < 0 || j >= maze.width) {
+            return;
+        }
+        const dx = x - (view.offsetX + j * SETTINGS.cellSize + SETTINGS.cellSize / 2);
+        const dy = y - (view.offsetY + i * SETTINGS.cellSize + SETTINGS.cellSize / 2);
+        if (Math.abs(dx) < SETTINGS.cellSize / 4 && Math.abs(dy) < SETTINGS.cellSize / 4) {
+            const item = maze.items[i][j];
+            if (item instanceof Player) {
+                return;
+            }
+            maze.items[i][j] = item ? null : new Diamond();
+            view.drawAll();
+            return;
+        }
+        if (dx > dy) {
+            if (dy < -dx) {
+                if (i > 0) {
+                    maze.horWalls[i][j] = !maze.horWalls[i][j];
+                }
+            } else {
+                if (j < maze.width - 1) {
+                    maze.verWalls[i][j + 1] = !maze.horWalls[i][j + 1];
+                }
+            }
+        } else {
+            if (dx < -dy) {
+                if (j > 0) {
+                    maze.verWalls[i][j] = !maze.verWalls[i][j];
+                }
+            } else {
+                if (i < maze.height - 1) {
+                    maze.horWalls[i + 1][j] = !maze.horWalls[i + 1][j];
+                }
+            }
+            
+        }
+        view.drawAll();
+    }
+
     document.addEventListener('keydown', processKeyDown);
     document.addEventListener('keyup', processKeyUp);
+    canvas.addEventListener('click', processClick);
 }
