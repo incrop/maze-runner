@@ -14,31 +14,39 @@ const SETTINGS = {
 const params = new URLSearchParams(window.location.search);
 const WIDTH = parseInt(params.get('w'), 10) || 13;
 const HEIGHT = parseInt(params.get('h'), 10) || 6;
-const DENSITY = parseInt(params.get('d'), 10) || 10;
+const DIAMONDS = parseInt(params.get('d'), 10) || 8;
 
 const SPRITES = {
     onload: play
-}
+};
 SPRITES.ArrowDown = loadSprites('img/finn.svg', 'img/finn.svg');
 SPRITES.ArrowLeft = loadSprites('img/finn-left.svg', 'img/finn-left.svg');
 SPRITES.ArrowUp = loadSprites('img/finn.svg', 'img/finn.svg');
 SPRITES.ArrowRight = loadSprites('img/finn.svg', 'img/finn.svg');
+SPRITES.win = loadSprites('img/finn.svg', 'img/finn-left.svg');
+
+const SOUND = {
+    background: new Audio('sound/background.ogg'),
+    diamond: new Audio('sound/diamond.ogg'),
+    win: new Audio('sound/win.ogg'),
+};
 
 class Player {
     constructor(i, j) {
         this.i = i;
         this.j = j;
         this.direction = 'ArrowDown';
-        this.moveStart = null;
+        this.moveTimestamp = null;
+        this.winTimestamp = null;
     }
     draw(timestamp, ctx, x, y) {
         const center = Math.floor(SETTINGS.cellSize / 2);
         const size = Math.floor(SETTINGS.cellSize * 0.4);
         x += center;
         y += center;
-        let spriteIdx = 0;
-        if (this.moveStart) {
-            const elapsed = timestamp - this.moveStart;
+        let sprite = SPRITES[this.direction][0];
+        if (this.moveTimestamp) {
+            const elapsed = timestamp - this.moveTimestamp;
             const offset = Math.min(SETTINGS.cellSize, Math.floor(SETTINGS.cellSize * elapsed / SETTINGS.moveTimeMs));
             switch (this.direction) {
                 case 'ArrowDown':
@@ -55,9 +63,15 @@ class Player {
                     break;
             }
             const spriteInterval = Math.floor(elapsed / SETTINGS.spriteTimeMs);
-            spriteIdx = (spriteInterval % (SPRITES[this.direction].length - 1)) + 1
+            const spriteIdx = (spriteInterval % (SPRITES[this.direction].length - 1)) + 1;
+            sprite = SPRITES[this.direction][spriteIdx];
+        } else if (this.winTimestamp) {
+            const elapsed = timestamp - this.winTimestamp;
+            const spriteInterval = Math.floor(elapsed / SETTINGS.moveTimeMs);
+            const spriteIdx = spriteInterval % SPRITES.win.length;
+            sprite = SPRITES.win[spriteIdx];
         }
-        ctx.drawImage(SPRITES[this.direction][spriteIdx], x + size, y + size, -2 * size, -2 * size);
+        ctx.drawImage(sprite, x + size, y + size, -2 * size, -2 * size);
     }
 }
 
@@ -88,6 +102,7 @@ class Maze {
         this.verWalls = Array.from(Array(height), () => Array(width + 1));
         this.items = Array.from(Array(height), () => Array(width));
         this.player = new Player(0, 0);
+        this.diamonds = 0;
         this.init();
     }
     init() {
@@ -127,13 +142,13 @@ class Maze {
     }
     process(timestamp, directions) {
         const p = this.player;
-        if (!p.moveStart) {
+        if (!p.moveTimestamp) {
             if (this.tryMoveAny(directions)) {
-                p.moveStart = timestamp;
+                p.moveTimestamp = timestamp;
             }
             return;
         }
-        if (timestamp - p.moveStart > SETTINGS.moveTimeMs) {
+        if (timestamp - p.moveTimestamp > SETTINGS.moveTimeMs) {
             this.items[p.i][p.j] = null;
             switch (p.direction) {
                 case 'ArrowDown':
@@ -149,16 +164,32 @@ class Maze {
                     p.j += 1;
                     break;
             }
+            if (this.items[p.i][p.j] instanceof Diamond) {
+                if (--this.diamonds === 0) {
+                    SOUND.background.pause();
+                    SOUND.win.play();
+                    p.winTimestamp = timestamp;
+                } else {
+                    if (SOUND.diamond.paused) {
+                        SOUND.diamond.play();
+                    } else {
+                        SOUND.diamond.fastSeek(0);
+                    }
+                }
+            }
             this.items[p.i][p.j] = p;
+            if (p.winTimestamp) {
+                p.winTimestamp = p.moveTimestamp + SETTINGS.moveTimeMs;
+            }
             if (this.tryMoveAny(directions)) {
-                p.moveStart += SETTINGS.moveTimeMs;
+                p.moveTimestamp += SETTINGS.moveTimeMs;
             } else {
-                p.moveStart = null;
+                p.moveTimestamp = null;
             }
         }
     }
     isAnimating() {
-        return this.player.moveStart;
+        return this.player.moveTimestamp || this.player.winTimestamp;
     }
 }
 
@@ -217,7 +248,6 @@ function generateDFS(maze) {
     const h = maze.height;
     const w = maze.width;
     const visited = Array.from(Array(h), () => Array(w));
-    const diamonds = Math.ceil(h * w * DENSITY / 100);
 
     for (let i = 0; i < h; i++) {
         for (let j = 0; j < w; j++) {
@@ -226,7 +256,8 @@ function generateDFS(maze) {
         }
     }
 
-    for (let d = 0; d < diamonds; d++) {
+    maze.diamonds = DIAMONDS;
+    for (let d = 0; d < DIAMONDS; d++) {
         let i;
         let j;
         do {
@@ -341,4 +372,6 @@ function play() {
     document.addEventListener('keydown', processKeyDown);
     document.addEventListener('keyup', processKeyUp);
 
+    SOUND.background.loop = true;
+    SOUND.background.play();
 }
