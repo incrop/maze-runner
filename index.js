@@ -328,16 +328,24 @@ function loadSprites(...urls) {
 }
 
 function play() {
-    const maze = new Maze(HEIGHT, WIDTH);
-    generateDFS(maze);
-
-    const view = new Viewport(document.getElementById('maze'), maze);
-    view.offsetX = SETTINGS.cellSize;
-    view.offsetY = SETTINGS.cellSize;
-    view.draw();
+    let maze;
+    let view;
 
     let pressedKeys = {};
     let animation = null;
+
+    reset();
+
+    function reset() {
+        maze = new Maze(HEIGHT, WIDTH);
+        generateDFS(maze);
+        view = new Viewport(document.getElementById('maze'), maze);
+        view.offsetX = SETTINGS.cellSize;
+        view.offsetY = SETTINGS.cellSize;
+        view.draw();
+        SOUND.background.loop = true;
+        SOUND.background.play();
+    }
 
     function moveAnimation(timestamp) {
         maze.process(timestamp, Object.keys(pressedKeys));
@@ -356,6 +364,15 @@ function play() {
             case 'ArrowUp':
             case 'ArrowDown':
                 break;
+            case 'Enter':
+            case ' ':
+                if (maze.player.winTimestamp) {
+                    reset();
+                }
+                return;
+            case 'Escape':
+                reset();
+                return;
             default:
                 return;
         }
@@ -371,7 +388,4 @@ function play() {
 
     document.addEventListener('keydown', processKeyDown);
     document.addEventListener('keyup', processKeyUp);
-
-    SOUND.background.loop = true;
-    SOUND.background.play();
 }
