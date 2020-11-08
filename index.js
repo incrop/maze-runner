@@ -73,6 +73,18 @@ class Player {
         }
         ctx.drawImage(sprite, x + size, y + size, -2 * size, -2 * size);
     }
+    targetCell() {
+        switch (this.direction) {
+            case 'ArrowDown':
+                return [this.i + 1, this.j];
+            case 'ArrowLeft':
+                return [this.i, this.j - 1];
+            case 'ArrowUp':
+                return [this.i - 1, this.j];
+            case 'ArrowRight':
+                return [this.i, this.j + 1];
+        }
+    }
 }
 
 class Diamond {
@@ -80,7 +92,7 @@ class Diamond {
     }
     draw(timestamp, ctx, x, y) {
         const center = Math.floor(SETTINGS.cellSize / 2);
-        const size = Math.floor(SETTINGS.cellSize / 4);
+        const size = Math.floor(SETTINGS.cellSize / 6);
         x += center;
         y += center;
         ctx.fillStyle = SETTINGS.diamondColor;
@@ -103,6 +115,7 @@ class Maze {
         this.items = Array.from(Array(height), () => Array(width));
         this.player = new Player(0, 0);
         this.diamonds = 0;
+        this.changedCells = [];
         this.init();
     }
     init() {
@@ -142,28 +155,17 @@ class Maze {
     }
     process(timestamp, directions) {
         const p = this.player;
+        this.changedCells = [[p.i, p.j]];
         if (!p.moveTimestamp) {
             if (this.tryMoveAny(directions)) {
                 p.moveTimestamp = timestamp;
             }
             return;
         }
+        this.changedCells.push(p.targetCell());
         if (timestamp - p.moveTimestamp > SETTINGS.moveTimeMs) {
             this.items[p.i][p.j] = null;
-            switch (p.direction) {
-                case 'ArrowDown':
-                    p.i += 1;
-                    break;
-                case 'ArrowLeft':
-                    p.j -= 1;
-                    break;
-                case 'ArrowUp':
-                    p.i -= 1;
-                    break;
-                case 'ArrowRight':
-                    p.j += 1;
-                    break;
-            }
+            [p.i, p.j] = p.targetCell();
             if (this.items[p.i][p.j] instanceof Diamond) {
                 if (--this.diamonds === 0) {
                     SOUND.background.pause();
@@ -200,7 +202,7 @@ class Viewport {
         this.offsetX = 0;
         this.offsetY = 0;
     }
-    draw(timestamp) {
+    drawAll(timestamp) {
         const ctx = this.canvas.getContext('2d');
         ctx.fillStyle = SETTINGS.bgColor;
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -217,7 +219,30 @@ class Viewport {
             }
         }
     }
-    _drawWall(_, ctx, i, j, isHor) {
+    drawChanged(timestamp) {
+        const ctx = this.canvas.getContext('2d');
+        ctx.fillStyle = SETTINGS.bgColor;
+        for (const [i, j] of this.maze.changedCells) {
+            this._clearCell(timestamp, ctx, i, j);
+        }
+        ctx.fillStyle = SETTINGS.wallColor;
+        for (const [i, j] of this.maze.changedCells) {
+            this._drawWall(timestamp, ctx, i, j, true);
+            this._drawWall(timestamp, ctx, i, j, false);
+        }
+        for (const [i, j] of this.maze.changedCells) {
+            this._drawItem(timestamp, ctx, i, j);
+        }
+    }
+    _clearCell(timestamp, ctx, i, j) {
+        const y = this.offsetY + i * SETTINGS.cellSize + SETTINGS.wallWidth;
+        const x = this.offsetX + j * SETTINGS.cellSize + SETTINGS.wallWidth;
+        const size = SETTINGS.cellSize - 2 * SETTINGS.wallWidth;
+        ctx.fillRect(x, y, size, size);
+        ctx.fillRect(x, y - 2 * SETTINGS.wallWidth, size, 2 * SETTINGS.wallWidth);
+        ctx.fillRect(x - 2 * SETTINGS.wallWidth, y, 2 * SETTINGS.wallWidth, size);
+    }
+    _drawWall(timestamp, ctx, i, j, isHor) {
         const walls = isHor ? this.maze.horWalls : this.maze.verWalls;
         if (!walls[i] || !walls[i][j]) {
             return;
@@ -342,14 +367,14 @@ function play() {
         view = new Viewport(document.getElementById('maze'), maze);
         view.offsetX = SETTINGS.cellSize;
         view.offsetY = SETTINGS.cellSize;
-        view.draw();
+        view.drawAll();
         SOUND.background.loop = true;
         SOUND.background.play();
     }
 
     function moveAnimation(timestamp) {
         maze.process(timestamp, Object.keys(pressedKeys));
-        view.draw(timestamp);
+        view.drawChanged(timestamp);
         if (maze.isAnimating()) {
             animation = requestAnimationFrame(moveAnimation);
         } else {
