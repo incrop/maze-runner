@@ -19,11 +19,11 @@ const DIAMONDS = parseInt(params.get('d'), 10) || 8;
 const SPRITES = {
     onload: play
 };
-SPRITES.ArrowDown = loadSprites('img/finn.svg', 'img/finn.svg');
-SPRITES.ArrowLeft = loadSprites('img/finn-left.svg', 'img/finn-left.svg');
-SPRITES.ArrowUp = loadSprites('img/finn.svg', 'img/finn.svg');
-SPRITES.ArrowRight = loadSprites('img/finn.svg', 'img/finn.svg');
-SPRITES.win = loadSprites('img/finn.svg', 'img/finn-left.svg');
+SPRITES.ArrowDown = loadSprites('img/right-stand.svg', 'img/right-move1.svg', 'img/right-move2.svg', 'img/right-move3.svg', 'img/right-move2.svg');
+SPRITES.ArrowLeft = loadSprites('img/left-stand.svg', 'img/left-move1.svg', 'img/left-move2.svg', 'img/left-move3.svg', 'img/left-move2.svg');
+SPRITES.ArrowUp = loadSprites('img/right-stand.svg', 'img/right-move1.svg', 'img/right-move2.svg', 'img/right-move3.svg', 'img/right-move2.svg');
+SPRITES.ArrowRight = loadSprites('img/right-stand.svg', 'img/right-move1.svg', 'img/right-move2.svg', 'img/right-move3.svg', 'img/right-move2.svg');
+SPRITES.win = loadSprites('img/right-move1.svg', 'img/right-stand.svg', 'img/left-move3.svg', 'img/left-stand.svg');
 
 const SOUND = {
     background: new Audio('sound/background.ogg'),
