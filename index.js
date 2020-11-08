@@ -5,7 +5,6 @@ const SETTINGS = {
     wallWidth: 5,
     bgColor: '#444444',
     wallColor: '#ffdb4d',
-    diamondColor: '#33ccff',
     playerColor: '#ff3300',
     moveTimeMs: 500, 
     spriteTimeMs: 100, 
@@ -14,7 +13,7 @@ const SETTINGS = {
 const params = new URLSearchParams(window.location.search);
 const WIDTH = parseInt(params.get('w'), 10) || 13;
 const HEIGHT = parseInt(params.get('h'), 10) || 6;
-const DIAMONDS = parseInt(params.get('d'), 10) || 8;
+const TREASURES = parseInt(params.get('t'), 10) || 8;
 const EDIT_MODE = !!params.get('e');
 
 const SPRITES = {
@@ -24,11 +23,12 @@ SPRITES.ArrowDown = loadSprites('img/right-stand.svg', 'img/right-move1.svg', 'i
 SPRITES.ArrowLeft = loadSprites('img/left-stand.svg', 'img/left-move1.svg', 'img/left-move2.svg', 'img/left-move3.svg', 'img/left-move2.svg');
 SPRITES.ArrowUp = loadSprites('img/right-stand.svg', 'img/right-move1.svg', 'img/right-move2.svg', 'img/right-move3.svg', 'img/right-move2.svg');
 SPRITES.ArrowRight = loadSprites('img/right-stand.svg', 'img/right-move1.svg', 'img/right-move2.svg', 'img/right-move3.svg', 'img/right-move2.svg');
+SPRITES.treasure = loadSprites('img/chest.svg', 'img/gem1.svg', 'img/gem2.svg', 'img/gem3.svg');
 SPRITES.win = loadSprites('img/right-move1.svg', 'img/right-stand.svg', 'img/left-move3.svg', 'img/left-stand.svg');
 
 const SOUND = {
     background: new Audio('sound/background.ogg'),
-    diamond: new Audio('sound/diamond.ogg'),
+    treasure: new Audio('sound/treasure.ogg'),
     win: new Audio('sound/win.ogg'),
 };
 
@@ -88,22 +88,19 @@ class Player {
     }
 }
 
-class Diamond {
+class Treasure {
     constructor() {
+        const spriteIdx = Math.floor(Math.random() * SPRITES.treasure.length);
+        this.sprite = SPRITES.treasure[spriteIdx];
     }
     draw(timestamp, ctx, x, y) {
         const center = Math.floor(SETTINGS.cellSize / 2);
-        const size = Math.floor(SETTINGS.cellSize / 6);
-        x += center;
-        y += center;
-        ctx.fillStyle = SETTINGS.diamondColor;
-        ctx.beginPath();
-        ctx.moveTo(x, y - size);
-        ctx.lineTo(x + size, y);
-        ctx.lineTo(x, y + size);
-        ctx.lineTo(x - size, y);
-        ctx.closePath();
-        ctx.fill();
+        const mul = 1.4;
+        const h = Math.floor(this.sprite.height * mul);
+        const w = Math.floor(this.sprite.width * mul);
+        x += center - Math.floor(w / 2);
+        y += center - Math.floor(h / 2);
+        ctx.drawImage(this.sprite, x, y, w, h);
     }
 }
 
@@ -115,7 +112,7 @@ class Maze {
         this.verWalls = Array.from(Array(height), () => Array(width + 1));
         this.items = Array.from(Array(height), () => Array(width));
         this.player = new Player(0, 0);
-        this.diamonds = 0;
+        this.treasures = 0;
         this.changedCells = [];
         this.init();
     }
@@ -167,16 +164,16 @@ class Maze {
         if (timestamp - p.moveTimestamp > SETTINGS.moveTimeMs) {
             this.items[p.i][p.j] = null;
             [p.i, p.j] = p.targetCell();
-            if (this.items[p.i][p.j] instanceof Diamond) {
-                if (--this.diamonds === 0) {
+            if (this.items[p.i][p.j] instanceof Treasure) {
+                if (--this.treasures === 0) {
                     SOUND.background.pause();
                     SOUND.win.play();
                     p.winTimestamp = timestamp;
                 } else {
-                    if (SOUND.diamond.paused) {
-                        SOUND.diamond.play();
+                    if (SOUND.treasure.paused) {
+                        SOUND.treasure.play();
                     } else {
-                        SOUND.diamond.fastSeek(0);
+                        SOUND.treasure.fastSeek(0);
                     }
                 }
             }
@@ -282,15 +279,15 @@ function generateDFS(maze) {
         }
     }
 
-    maze.diamonds = DIAMONDS;
-    for (let d = 0; d < DIAMONDS; d++) {
+    maze.treasures = TREASURES;
+    for (let d = 0; d < TREASURES; d++) {
         let i;
         let j;
         do {
             i = Math.floor(Math.random() * h);
             j = Math.floor(Math.random() * w);
         } while (maze.items[i][j]);
-        maze.items[i][j] = new Diamond();
+        maze.items[i][j] = new Treasure();
     }
 
     generateStep(Math.floor(Math.random() * h), Math.floor(Math.random() * w));
@@ -435,7 +432,7 @@ function play() {
             if (item instanceof Player) {
                 return;
             }
-            maze.items[i][j] = item ? null : new Diamond();
+            maze.items[i][j] = item ? null : new Treasure();
             view.drawAll();
             return;
         }
