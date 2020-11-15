@@ -143,7 +143,6 @@ class Maze {
         this.verWalls = Array.from(Array(height), () => Array(width + 1));
         this.items = Array.from(Array(height), () => Array(width));
         this.player = new Player(0, 0);
-        this.skeletons = [];
         this.treasures = 0;
         this.changedCells = [];
         this.init();
@@ -192,9 +191,10 @@ class Maze {
                 return;
             }
         }
+        const moveFinished = timestamp - p.moveTimestamp > SETTINGS.moveTimeMs;
         this.changedCells.push(p.targetCell());
-        this._checkIfSkeletonNearby(timestamp);
-        if (timestamp - p.moveTimestamp > SETTINGS.moveTimeMs) {
+        this._processNeighborSkeletons(timestamp, moveFinished);
+        if (moveFinished) {
             [p.i, p.j] = p.targetCell();
             if (this.items[p.i][p.j] instanceof Treasure) {
                 if (--this.treasures === 0) {
@@ -210,9 +210,6 @@ class Maze {
                 }
                 this.items[p.i][p.j] = null;
             }
-            for (const skeleton of this.skeletons) {
-                skeleton.progress = false;
-            }
             if (p.winTimestamp) {
                 p.winTimestamp = p.moveTimestamp + SETTINGS.moveTimeMs;
             }
@@ -223,7 +220,7 @@ class Maze {
             }
         }
     }
-    _checkIfSkeletonNearby(timestamp) {
+    _processNeighborSkeletons(timestamp, moveFinished) {
         const [i1, j1] = this.player.targetCell();
         if (this.items[i1][j1] instanceof Skeleton) {
             const skeleton = this.items[i1][j1];
@@ -232,10 +229,9 @@ class Maze {
                 skeleton.progress = true;
                 SOUND.skeleton.dead.play();
             }
-            if (skeleton.progress) {
-                this.changedCells.push([i1, j1]);
-            }    
-            return;
+            if (moveFinished) {
+                skeleton.progress = false;
+            }
         }
         for (const [di, dj] of [[1, 0], [0, 1], [-1, 0], [0, -1]]) {
             const [i2, j2] = [i1 + di, j1 + dj];
@@ -252,7 +248,9 @@ class Maze {
                 if (skeleton.progress) {
                     this.changedCells.push([i2, j2]);
                 }
-                return;
+                if (moveFinished) {
+                    skeleton.progress = false;
+                }
             }
         }
     }
@@ -361,9 +359,7 @@ function generateDFS(maze) {
         putAtRandom(new Treasure());
     }
     for (let s = 0; s < SKELETONS; s++) {
-        const skeleton = new Skeleton();
-        maze.skeletons.push(skeleton);
-        putAtRandom(skeleton);
+        putAtRandom(new Skeleton());
     }
 
     generateStep(Math.floor(Math.random() * h), Math.floor(Math.random() * w));
@@ -523,7 +519,10 @@ function play() {
                 return;
             }
             const item = maze.items[i][j];
-            maze.items[i][j] = item ? null : new Treasure();
+            maze.items[i][j] =
+                item ? null :
+                e.ctrlKey ? new Skeleton() :
+                new Treasure();
             requestAnimationFrame(redraw);
             return;
         }
