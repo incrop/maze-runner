@@ -20,12 +20,12 @@ const EDIT_MODE = !!params.get('e');
 const SPRITES = {
     onload: play
 };
-SPRITES.ArrowDown = loadSprites('img/down-stand.svg', 'img/down-move1.svg', 'img/down-move2.svg');
+SPRITES.ArrowDown = loadSprites('img/down-stand.svg', 'img/down-move1.svg', 'img/down-move3.svg');
 SPRITES.ArrowLeft = loadSprites('img/left-stand.svg', 'img/left-move1.svg', 'img/left-move2.svg', 'img/left-move3.svg', 'img/left-move2.svg');
-SPRITES.ArrowUp = loadSprites('img/up-stand.svg', 'img/up-move1.svg', 'img/up-move2.svg');
+SPRITES.ArrowUp = loadSprites('img/up-stand.svg', 'img/up-move1.svg', 'img/up-move3.svg');
 SPRITES.ArrowRight = loadSprites('img/right-stand.svg', 'img/right-move1.svg', 'img/right-move2.svg', 'img/right-move3.svg', 'img/right-move2.svg');
-SPRITES.treasure = loadSprites('img/chest.svg', 'img/gem1.svg', 'img/gem2.svg', 'img/gem3.svg');
-SPRITES.skeleton = loadSprites('img/skeleton1.svg', 'img/skeleton2.svg', 'img/skeleton3.svg', 'img/skeleton4.svg');
+SPRITES.treasure = loadSprites('img/chest1-1.svg', 'img/gem1-1.svg', 'img/gem2-1.svg', 'img/gem3-1.svg');
+SPRITES.skeleton = loadSprites('img/skeleton1-1.svg', 'img/skeleton2.svg', 'img/skeleton-stand2.svg', 'img/skeleton1-2.svg');
 SPRITES.win = loadSprites('img/down-stand.svg', 'img/down-cheer.svg');
 
 const SOUND = {
@@ -101,9 +101,8 @@ class Treasure {
     }
     draw(timestamp, ctx, x, y) {
         const center = Math.floor(SETTINGS.cellSize / 2);
-        const mul = 1.4;
-        const h = Math.floor(this.sprite.height * mul);
-        const w = Math.floor(this.sprite.width * mul);
+        const h = Math.floor(this.sprite.height);
+        const w = Math.floor(this.sprite.width);
         x += center - Math.floor(w / 2);
         y += center - Math.floor(h / 2);
         ctx.drawImage(this.sprite, x, y, w, h);
