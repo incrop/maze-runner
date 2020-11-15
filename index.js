@@ -205,7 +205,7 @@ class Maze {
                     if (SOUND.treasure.paused) {
                         SOUND.treasure.play();
                     } else {
-                        SOUND.treasure.fastSeek(0);
+                        SOUND.treasure.currentTime = 0;
                     }
                 }
                 this.items[p.i][p.j] = null;
