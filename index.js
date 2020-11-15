@@ -24,7 +24,12 @@ SPRITES.ArrowDown = loadSprites('img/down-stand.svg', 'img/down-move1.svg', 'img
 SPRITES.ArrowLeft = loadSprites('img/left-stand.svg', 'img/left-move1.svg', 'img/left-move2.svg', 'img/left-move3.svg', 'img/left-move2.svg');
 SPRITES.ArrowUp = loadSprites('img/up-stand.svg', 'img/up-move1.svg', 'img/up-move3.svg');
 SPRITES.ArrowRight = loadSprites('img/right-stand.svg', 'img/right-move1.svg', 'img/right-move2.svg', 'img/right-move3.svg', 'img/right-move2.svg');
-SPRITES.treasure = loadSprites('img/chest1-1.svg', 'img/gem1-1.svg', 'img/gem2-1.svg', 'img/gem3-1.svg');
+SPRITES.treasure = {
+    chest: loadSprites('img/chest1-1.svg', 'img/chest1-2.svg'),
+    gem1: loadSprites('img/gem1-1.svg', 'img/gem1-2.svg'),
+    gem2: loadSprites('img/gem2-1.svg', 'img/gem2-2.svg'),
+    gem3: loadSprites('img/gem3-1.svg', 'img/gem3-2.svg'),
+};
 SPRITES.skeleton = loadSprites('img/skeleton1-1.svg', 'img/skeleton2.svg', 'img/skeleton-stand2.svg', 'img/skeleton1-2.svg');
 SPRITES.win = loadSprites('img/down-stand.svg', 'img/down-cheer.svg');
 
@@ -96,16 +101,19 @@ class Player {
 
 class Treasure {
     constructor() {
-        const spriteIdx = Math.floor(Math.random() * SPRITES.treasure.length);
-        this.sprite = SPRITES.treasure[spriteIdx];
+        const names = Object.keys(SPRITES.treasure);
+        const name = names[Math.floor(Math.random() * names.length)];
+        this.sprites = SPRITES.treasure[name];
     }
     draw(timestamp, ctx, x, y) {
+        const spriteIdx = Math.floor((timestamp % (SETTINGS.moveTimeMs * 2)) / SETTINGS.moveTimeMs);
+        const sprite = this.sprites[spriteIdx];
         const center = Math.floor(SETTINGS.cellSize / 2);
-        const h = Math.floor(this.sprite.height);
-        const w = Math.floor(this.sprite.width);
+        const h = Math.floor(sprite.height);
+        const w = Math.floor(sprite.width);
         x += center - Math.floor(w / 2);
         y += center - Math.floor(h / 2);
-        ctx.drawImage(this.sprite, x, y, w, h);
+        ctx.drawImage(sprite, x, y, w, h);
     }
 }
 
@@ -144,7 +152,6 @@ class Maze {
         this.items = Array.from(Array(height), () => Array(width));
         this.player = new Player(0, 0);
         this.treasures = 0;
-        this.changedCells = [];
         this.init();
     }
     init() {
@@ -183,7 +190,6 @@ class Maze {
     }
     process(timestamp, directions) {
         const p = this.player;
-        this.changedCells = [[p.i, p.j]];
         if (!p.moveTimestamp) {
             if (this.tryMoveAny(directions)) {
                 p.moveTimestamp = timestamp;
@@ -192,7 +198,6 @@ class Maze {
             }
         }
         const moveFinished = timestamp - p.moveTimestamp > SETTINGS.moveTimeMs;
-        this.changedCells.push(p.targetCell());
         this._processNeighborSkeletons(timestamp, moveFinished);
         if (moveFinished) {
             [p.i, p.j] = p.targetCell();
@@ -245,9 +250,6 @@ class Maze {
                     skeleton.progress = true;
                     SOUND.skeleton.wake.play();
                 }
-                if (skeleton.progress) {
-                    this.changedCells.push([i2, j2]);
-                }
                 if (moveFinished) {
                     skeleton.progress = false;
                 }
@@ -281,22 +283,6 @@ class Viewport {
             for (let j = 0; j <= this.maze.width; j++) {
                 this._drawItem(timestamp, ctx, i, j);
             }
-        }
-        this._drawPlayer(timestamp, ctx);
-    }
-    drawChanged(timestamp) {
-        const ctx = this.canvas.getContext('2d');
-        ctx.fillStyle = SETTINGS.bgColor;
-        for (const [i, j] of this.maze.changedCells) {
-            this._clearCell(timestamp, ctx, i, j);
-        }
-        ctx.fillStyle = SETTINGS.wallColor;
-        for (const [i, j] of this.maze.changedCells) {
-            this._drawWall(timestamp, ctx, i, j, true);
-            this._drawWall(timestamp, ctx, i, j, false);
-        }
-        for (const [i, j] of this.maze.changedCells) {
-            this._drawItem(timestamp, ctx, i, j);
         }
         this._drawPlayer(timestamp, ctx);
     }
@@ -438,9 +424,9 @@ function play() {
     let view;
 
     let pressedKeys = {};
-    let animation = null;
 
     reset();
+    requestAnimationFrame(draw);
 
     function reset() {
         maze = new Maze(HEIGHT, WIDTH);
@@ -451,24 +437,15 @@ function play() {
         view = new Viewport(canvas, maze);
         view.offsetX = SETTINGS.cellSize;
         view.offsetY = SETTINGS.cellSize;
-        requestAnimationFrame(redraw);
         SOUND.background.loop = true;
         SOUND.background.play();
     }
 
-    function moveAnimation(timestamp) {
+    function draw(timestamp) {
         maze.process(timestamp, Object.keys(pressedKeys));
-        view.drawChanged(timestamp);
-        if (maze.isAnimating()) {
-            animation = requestAnimationFrame(moveAnimation);
-        } else {
-            animation = null;
-        }
-    }
-
-    function redraw(timestamp) {
         view.drawAll(timestamp);
-    } 
+        requestAnimationFrame(draw);
+    }
 
     function processKeyDown(e) {
         switch (e.key) {
@@ -490,9 +467,6 @@ function play() {
                 return;
         }
         pressedKeys[e.key] = true;
-        if (!animation) {
-            animation = window.requestAnimationFrame(moveAnimation);
-        }
     }
 
     function processKeyUp(e) {
@@ -523,7 +497,6 @@ function play() {
                 item ? null :
                 e.ctrlKey ? new Skeleton() :
                 new Treasure();
-            requestAnimationFrame(redraw);
             return;
         }
         if (dx > dy) {
@@ -548,7 +521,6 @@ function play() {
             }
             
         }
-        requestAnimationFrame(redraw);
     }
 
     document.addEventListener('keydown', processKeyDown);
