@@ -11,10 +11,12 @@ const SETTINGS = {
 };
 
 const params = new URLSearchParams(window.location.search);
-const WIDTH = parseInt(params.get('w'), 10) || 13;
-const HEIGHT = parseInt(params.get('h'), 10) || 6;
-const TREASURES = parseInt(params.get('t'), 10) || 8;
-const SKELETONS = parseInt(params.get('s'), 10) || 2;
+const WIDTH = parseInt(params.get('w') || 13, 10);
+const HEIGHT = parseInt(params.get('h') || 6, 10);
+const TREASURES = parseInt(params.get('t') || 8, 10);
+const SKELETONS = parseInt(params.get('s') || 2, 10);
+const POTS = parseInt(params.get('p') || 4, 10);
+const GHOSTS = parseInt(params.get('g') || 2, 10);
 const EDIT_MODE = !!params.get('e');
 
 const SPRITES = {
@@ -31,6 +33,10 @@ SPRITES.treasure = {
     gem3: loadSprites('img/gem3-1.svg', 'img/gem3-2.svg'),
 };
 SPRITES.skeleton = loadSprites('img/skeleton1-1.svg', 'img/skeleton2.svg', 'img/skeleton-stand2.svg', 'img/skeleton1-2.svg');
+SPRITES.ghost = {
+    sleep: loadSprites('img/ghost1.svg', 'img/ghost2.svg', 'img/ghost3.svg'),
+    wake: loadSprites('img/ghost-stand1.svg', 'img/ghost-stand2.svg', 'img/ghost-stand3.svg'),
+};
 SPRITES.win = loadSprites('img/down-stand.svg', 'img/down-cheer.svg');
 
 const SOUND = {
@@ -40,6 +46,7 @@ const SOUND = {
         wake: new Audio('sound/skeleton-wake.ogg'),
         dead: new Audio('sound/skeleton-dead.ogg'),
     },
+    ghost: new Audio('sound/ghost.ogg'),
     win: new Audio('sound/win.ogg'),
 };
 
@@ -123,7 +130,7 @@ class Skeleton {
         this.progress = false;
     }
     draw(timestamp, ctx, x, y) {
-        const sprite = SPRITES.skeleton[this._spriteIdx(timestamp)];
+        const sprite = SPRITES.skeleton[this._spriteIdx()];
         const center = Math.floor(SETTINGS.cellSize / 2);
         const h = Math.floor(sprite.height);
         const w = Math.floor(sprite.width);
@@ -131,7 +138,7 @@ class Skeleton {
         y += center - Math.floor(h / 2);
         ctx.drawImage(sprite, x, y, w, h);
     }
-    _spriteIdx(timestamp) {
+    _spriteIdx() {
         switch (this.state) {
             case 'sleep':
                 return 0;
@@ -142,6 +149,50 @@ class Skeleton {
         }
     }
 }
+
+class Pot {
+    constructor() {
+    }
+    draw(timestamp, ctx, x, y) {
+        const sprite = SPRITES.ghost.sleep[0];
+        const center = Math.floor(SETTINGS.cellSize / 2);
+        const h = Math.floor(sprite.height);
+        const w = Math.floor(sprite.width);
+        x += center - Math.floor(w / 2);
+        y += center - Math.floor(h / 2);
+        ctx.drawImage(sprite, x, y, w, h);
+    }
+}
+
+
+class Ghost {
+    constructor() {
+        this.state = 'sleep'
+        this.progress = 0;
+    }
+    draw(timestamp, ctx, x, y) {
+        const sprite = this._getSprite(timestamp);
+        const center = Math.floor(SETTINGS.cellSize / 2);
+        const h = Math.floor(sprite.height);
+        const w = Math.floor(sprite.width);
+        x += center - Math.floor(w / 2);
+        y += center - Math.floor(h / 2);
+        ctx.drawImage(sprite, x, y, w, h);
+    }
+    _getSprite(timestamp) {
+        switch (this.state) {
+            case 'sleep':
+                return SPRITES.ghost.sleep[this.progress];
+            case 'wake':
+                const quarter = Math.floor((timestamp % (SETTINGS.moveTimeMs * 4)) / SETTINGS.moveTimeMs);
+                const idx =
+                    quarter === 0 ? 0 :
+                    quarter === 2 ? 2 : 1
+                return SPRITES.ghost.wake[idx];              
+        }
+    }
+}
+
 
 class Maze {
     constructor(height, width) { 
@@ -168,16 +219,26 @@ class Maze {
         const p = this.player;
         switch (direction) {
             case 'ArrowDown':
-                return !this.horWalls[p.i + 1][p.j];
+                return !this.horWalls[p.i + 1][p.j] && !this.isBlocked(p.i + 1, p.j);
             case 'ArrowLeft':
-                return !this.verWalls[p.i][p.j];
+                return !this.verWalls[p.i][p.j] && !this.isBlocked(p.i, p.j - 1);
             case 'ArrowUp':
-                return !this.horWalls[p.i][p.j];
+                return !this.horWalls[p.i][p.j] && !this.isBlocked(p.i - 1, p.j);
             case 'ArrowRight':
-                return !this.verWalls[p.i][p.j + 1];
+                return !this.verWalls[p.i][p.j + 1] && !this.isBlocked(p.i, p.j + 1);
             default:
                 return false;
         }
+    }
+    isBlocked(i, j) {
+        if (i < 0 || i >= this.height || j < 0 || j >= this.width) {
+            return true;
+        }
+        const item = this.items[i][j]
+        if (!item) {
+            return false;
+        }
+        return item instanceof Ghost;
     }
     tryMoveAny(directions) {
         for (const direction of directions) {
@@ -197,11 +258,12 @@ class Maze {
                 return;
             }
         }
-        const moveFinished = timestamp - p.moveTimestamp > SETTINGS.moveTimeMs;
-        this._processNeighborSkeletons(timestamp, moveFinished);
-        if (moveFinished) {
+        const moveProgress = (timestamp - p.moveTimestamp) / SETTINGS.moveTimeMs;
+        this._processNeighborSkeletons(moveProgress);
+        this._processNeighborGhosts(moveProgress);
+        if (moveProgress > 1) {
             [p.i, p.j] = p.targetCell();
-            if (this.items[p.i][p.j] instanceof Treasure) {
+            if (this.items[p.i][p.j] instanceof Treasure || this.items[p.i][p.j] instanceof Pot) {
                 if (--this.treasures === 0) {
                     SOUND.background.pause();
                     SOUND.win.play();
@@ -225,7 +287,7 @@ class Maze {
             }
         }
     }
-    _processNeighborSkeletons(timestamp, moveFinished) {
+    _processNeighborSkeletons(moveProgress) {
         const [i1, j1] = this.player.targetCell();
         if (this.items[i1][j1] instanceof Skeleton) {
             const skeleton = this.items[i1][j1];
@@ -234,7 +296,7 @@ class Maze {
                 skeleton.progress = true;
                 SOUND.skeleton.dead.play();
             }
-            if (moveFinished) {
+            if (moveProgress > 1) {
                 skeleton.progress = false;
             }
         }
@@ -250,8 +312,36 @@ class Maze {
                     skeleton.progress = true;
                     SOUND.skeleton.wake.play();
                 }
-                if (moveFinished) {
+                if (moveProgress > 1) {
                     skeleton.progress = false;
+                }
+            }
+        }
+    }
+    _processNeighborGhosts(moveProgress) {
+        const [i1, j1] = this.player.targetCell();
+        for (const [di, dj] of [[1, 0], [0, 1], [-1, 0], [0, -1]]) {
+            const [i2, j2] = [i1 + di, j1 + dj];
+            if (!this.items[i2] || !this.items[i2][j2]) {
+                continue;
+            }
+            if (this.items[i2][j2] instanceof Ghost) {
+                if (
+                    (di === -1 && this.horWalls[i1][j1]) ||
+                    (di === 1 && this.horWalls[i1 + 1][j1]) ||
+                    (dj === -1 && this.verWalls[i1][j1]) ||
+                    (dj === 1 && this.verWalls[i1][j1 + 1])) {
+                    continue;
+                }
+                const ghost = this.items[i2][j2];
+                if (ghost.state === 'sleep') {
+                    if (!ghost.progress) {
+                        SOUND.ghost.play();
+                    }
+                    ghost.progress = moveProgress < 0.5 ? 1 : 2;
+                }
+                if (moveProgress > 1) {
+                    ghost.state = 'wake';
                 }
             }
         }
@@ -340,17 +430,20 @@ function generateDFS(maze) {
         }
     }
 
-    maze.treasures = TREASURES;
-    for (let d = 0; d < TREASURES; d++) {
+    maze.treasures = TREASURES + POTS;
+    for (let i = 0; i < TREASURES; i++) {
         putAtRandom(new Treasure());
     }
-    for (let s = 0; s < SKELETONS; s++) {
+    for (let i = 0; i < SKELETONS; i++) {
         putAtRandom(new Skeleton());
+    }
+    for (let i = 0; i < POTS; i++) {
+        putAtRandom(new Pot());
     }
 
     generateStep(Math.floor(Math.random() * h), Math.floor(Math.random() * w));
     
-    function generateStep(i, j) {
+    function generateStep(i, j, depth) {
         visited[i][j] = true;
         for (const dir of shuffleDir()) {
             switch (dir) {
@@ -383,13 +476,17 @@ function generateDFS(maze) {
         }
     }
 
-    function putAtRandom(item) {
+    for (let i = 0; i < GHOSTS; i++) {
+        putAtRandom(new Ghost(), createLoop);
+    }
+
+    function putAtRandom(item, extraCheck) {
         let i;
         let j;
         do {
             i = Math.floor(Math.random() * h);
             j = Math.floor(Math.random() * w);
-        } while ((i + j) <= 1 || maze.items[i][j]);
+        } while ((i + j) <= 1 || maze.items[i][j] || (extraCheck && !extraCheck(i, j)));
         maze.items[i][j] = item;
     }
 
@@ -400,6 +497,90 @@ function generateDFS(maze) {
             [a[i], a[j]] = [a[j], a[i]];
         }
         return a;
+    }
+
+    function createLoop(i, j) {
+        const start = [];
+        if (!maze.horWalls[i][j]) {
+            if (maze.items[i][j] instanceof Ghost) {
+                return false;
+            }
+            start.push([i - 1, j]);
+        }
+        if (!maze.horWalls[i + 1][j]) {
+            if (maze.items[i + 1][j] instanceof Ghost) {
+                return false;
+            }
+            start.push([i + 1, j]);
+        }
+        if (!maze.verWalls[i][j]) {
+            if (maze.items[i][j - 1] instanceof Ghost) {
+                return false;
+            }
+            start.push([i, j - 1]);
+        }
+        if (!maze.verWalls[i][j + 1]) {
+            if (maze.items[i][j + 1] instanceof Ghost) {
+                return false;
+            }
+            start.push([i, j + 1]);
+        }
+        if (start.length != 2) {
+            return false;
+        }
+        const dist = Array.from(Array(h + 1), () => Array(w + 1));
+        flood(start[0], 1, i => i + 1);
+        flood(start[1], -1, i => i - 1);
+        const max = {
+            dist: 0,
+            wall: [],
+            i: 0,
+            j: 0,
+        }
+        for (let i = 0; i < h; i++) {
+            for (let j = 0; j < w; j++) {
+                let d = Math.abs(dist[i][j] - dist[i + 1][j]);
+                if (dist[i][j] * dist[i + 1][j] < 0 && d > max.dist) {
+                    max.dist = d;
+                    max.wall = maze.horWalls;
+                    max.i = i + 1;
+                    max.j = j;
+                }
+                d = Math.abs(dist[i][j] - dist[i][j + 1]);
+                if (dist[i][j] * dist[i + 1][j] < 0 && d > max.dist) {
+                    max.dist = d;
+                    max.wall = maze.verWalls
+                    max.i = i;
+                    max.j = j + 1;
+                }
+            }
+        }
+        if (max.dist <= 3) {
+            return false;
+        }
+        max.wall[max.i][max.j] = false;
+        return true;
+        
+        function flood([i1, j1], val, upd) {
+            dist[i1][j1] = val;
+            for (const [di, dj] of [[1, 0], [0, 1], [-1, 0], [0, -1]]) {
+                if (
+                    (di === -1 && maze.horWalls[i1][j1]) ||
+                    (di === 1 && maze.horWalls[i1 + 1][j1]) ||
+                    (dj === -1 && maze.verWalls[i1][j1]) ||
+                    (dj === 1 && maze.verWalls[i1][j1 + 1])) {
+                    continue;
+                }
+                const [i2, j2] = [i1 + di, j1 + dj];
+                if (i2 === i && j2 === j) {
+                    continue;
+                }
+                if (dist[i2][j2] || maze.items[i2][j2] instanceof Ghost) {
+                    continue;
+                }
+                flood([i2, j2], upd(val), upd);
+            }
+        }
     }
 }
 
@@ -496,6 +677,7 @@ function play() {
             maze.items[i][j] =
                 item ? null :
                 e.ctrlKey ? new Skeleton() :
+                e.altKey ? new Ghost() :
                 new Treasure();
             return;
         }
