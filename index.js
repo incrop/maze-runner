@@ -32,7 +32,10 @@ SPRITES.treasure = {
     gem2: loadSprites('img/gem2-1.svg', 'img/gem2-2.svg'),
     gem3: loadSprites('img/gem3-1.svg', 'img/gem3-2.svg'),
 };
-SPRITES.skeleton = loadSprites('img/skeleton1-1.svg', 'img/skeleton2.svg', 'img/skeleton-stand2.svg', 'img/skeleton1-2.svg');
+SPRITES.skeleton = {
+    sleep: loadSprites('img/skeleton1-1.svg', 'img/skeleton1-2.svg', 'img/skeleton2.svg'),
+    wake: loadSprites('img/skeleton-stand1.svg', 'img/skeleton-stand2.svg', 'img/skeleton-stand3.svg'),
+}
 SPRITES.ghost = {
     sleep: loadSprites('img/ghost1.svg', 'img/ghost2.svg', 'img/ghost3.svg'),
     wake: loadSprites('img/ghost-stand1.svg', 'img/ghost-stand2.svg', 'img/ghost-stand3.svg'),
@@ -130,7 +133,7 @@ class Skeleton {
         this.progress = false;
     }
     draw(timestamp, ctx, x, y) {
-        const sprite = SPRITES.skeleton[this._spriteIdx()];
+        const sprite = this._getSprite(timestamp);
         const center = Math.floor(SETTINGS.cellSize / 2);
         const h = Math.floor(sprite.height);
         const w = Math.floor(sprite.width);
@@ -138,14 +141,21 @@ class Skeleton {
         y += center - Math.floor(h / 2);
         ctx.drawImage(sprite, x, y, w, h);
     }
-    _spriteIdx() {
+    _getSprite(timestamp) {
+        if (this.progress) {
+            return SPRITES.skeleton.sleep[2];
+        }
         switch (this.state) {
             case 'sleep':
-                return 0;
-            case 'wake':
-                return this.progress ? 1 : 2;
+                return SPRITES.skeleton.sleep[0];
             case 'dead':
-                return this.progress ? 1 : 3;               
+                return SPRITES.skeleton.sleep[1];             
+            case 'wake':
+                const quarter = Math.floor((timestamp % (SETTINGS.moveTimeMs * 4)) / SETTINGS.moveTimeMs);
+                const idx =
+                    quarter === 0 ? 0 :
+                    quarter === 2 ? 2 : 1
+                return SPRITES.skeleton.wake[idx];
         }
     }
 }
