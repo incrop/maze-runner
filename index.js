@@ -549,7 +549,7 @@ function generateDFS(maze) {
                     max.j = j;
                 }
                 d = Math.abs(dist[i][j] - dist[i][j + 1]);
-                if (dist[i][j] * dist[i + 1][j] < 0 && d > max.dist) {
+                if (dist[i][j] * dist[i][j + 1] < 0 && d > max.dist) {
                     max.dist = d;
                     max.wall = maze.verWalls
                     max.i = i;
