@@ -59,7 +59,7 @@ class Player {
         this.j = j;
         this.direction = 'ArrowDown';
         this.moveTimestamp = null;
-        this.winTimestamp = null;
+        this.win = false;
     }
     draw(timestamp, ctx, x, y) {
         const center = Math.floor(SETTINGS.cellSize / 2);
@@ -87,10 +87,8 @@ class Player {
             const spriteInterval = Math.floor(elapsed / SETTINGS.spriteTimeMs);
             const spriteIdx = (spriteInterval % (SPRITES[this.direction].length - 1)) + 1;
             sprite = SPRITES[this.direction][spriteIdx];
-        } else if (this.winTimestamp) {
-            const elapsed = timestamp - this.winTimestamp;
-            const spriteInterval = Math.floor(elapsed / SETTINGS.moveTimeMs);
-            const spriteIdx = spriteInterval % SPRITES.win.length;
+        } else if (this.win) {
+            const spriteIdx = Math.floor((timestamp % (SETTINGS.moveTimeMs * 2)) / SETTINGS.moveTimeMs);
             sprite = SPRITES.win[spriteIdx];
         }
         ctx.drawImage(sprite, x + size, y + size, -2 * size, -2 * size);
@@ -277,7 +275,7 @@ class Maze {
                 if (--this.treasures === 0) {
                     SOUND.background.pause();
                     SOUND.win.play();
-                    p.winTimestamp = timestamp;
+                    p.win = true;
                 } else {
                     if (SOUND.treasure.paused) {
                         SOUND.treasure.play();
@@ -286,9 +284,6 @@ class Maze {
                     }
                 }
                 this.items[p.i][p.j] = null;
-            }
-            if (p.winTimestamp) {
-                p.winTimestamp = p.moveTimestamp + SETTINGS.moveTimeMs;
             }
             if (this.tryMoveAny(directions)) {
                 p.moveTimestamp += SETTINGS.moveTimeMs;
@@ -355,9 +350,6 @@ class Maze {
                 }
             }
         }
-    }
-    isAnimating() {
-        return this.player.moveTimestamp || this.player.winTimestamp;
     }
 }
 
@@ -647,7 +639,7 @@ function play() {
                 break;
             case 'Enter':
             case ' ':
-                if (maze.player.winTimestamp) {
+                if (maze.player.win) {
                     reset();
                 }
                 return;
