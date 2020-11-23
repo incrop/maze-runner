@@ -27,14 +27,16 @@ SPRITES.ArrowLeft = loadSprites('img/left-stand.svg', 'img/left-move1.svg', 'img
 SPRITES.ArrowUp = loadSprites('img/up-stand.svg', 'img/up-move1.svg', 'img/up-move3.svg');
 SPRITES.ArrowRight = loadSprites('img/right-stand.svg', 'img/right-move1.svg', 'img/right-move2.svg', 'img/right-move3.svg', 'img/right-move2.svg');
 SPRITES.treasure = {
-    chest: loadSprites('img/chest1-1.svg', 'img/chest1-2.svg'),
-    gem1: loadSprites('img/gem1-1.svg', 'img/gem1-2.svg'),
-    gem2: loadSprites('img/gem2-1.svg', 'img/gem2-2.svg'),
-    gem3: loadSprites('img/gem3-1.svg', 'img/gem3-2.svg'),
+    chest: loadSprites('img/chest1-1.svg', 'img/chest1-2.svg', 'img/chest1-3.svg', 'img/chest1-4.svg'),
+    gem1: loadSprites('img/gem1-1.svg', 'img/gem1-2.svg', 'img/gem1-3.svg', 'img/gem1-4.svg'),
+    gem2: loadSprites('img/gem2-1.svg', 'img/gem2-2.svg', 'img/gem2-3.svg', 'img/gem2-4.svg'),
+    gem3: loadSprites('img/gem3-1.svg', 'img/gem3-2.svg', 'img/gem3-3.svg', 'img/gem3-4.svg'),
+    gem4: loadSprites('img/gem4-1.svg', 'img/gem4-2.svg', 'img/gem4-3.svg', 'img/gem4-4.svg'),
 };
 SPRITES.skeleton = {
-    sleep: loadSprites('img/skeleton1-1.svg', 'img/skeleton1-2.svg', 'img/skeleton2.svg'),
-    wake: loadSprites('img/skeleton-stand1.svg', 'img/skeleton-stand2.svg', 'img/skeleton-stand3.svg'),
+    sleep: loadSprites('img/skeleton-appear1.svg', 'img/skeleton-appear2.svg', 'img/skeleton-down-stand.svg'),
+    wake: loadSprites('img/skeleton-dance1.svg', 'img/skeleton-dance2.svg', 'img/skeleton-dance3.svg'),
+    dead: loadSprites('img/skeleton-die1.svg', 'img/skeleton-die2.svg', 'img/skeleton-die3.svg'),
 }
 SPRITES.ghost = {
     sleep: loadSprites('img/ghost1.svg', 'img/ghost2.svg', 'img/ghost3.svg'),
@@ -114,7 +116,7 @@ class Treasure {
         this.sprites = SPRITES.treasure[name];
     }
     draw(timestamp, ctx, x, y) {
-        const spriteIdx = Math.floor((timestamp % (SETTINGS.moveTimeMs * 2)) / SETTINGS.moveTimeMs);
+        const spriteIdx = Math.floor((timestamp % (SETTINGS.moveTimeMs * 4)) / SETTINGS.moveTimeMs);
         const sprite = this.sprites[spriteIdx];
         const center = Math.floor(SETTINGS.cellSize / 2);
         const h = Math.floor(sprite.height);
@@ -128,7 +130,7 @@ class Treasure {
 class Skeleton {
     constructor() {
         this.state = 'sleep';
-        this.progress = false;
+        this.progress = 0;
     }
     draw(timestamp, ctx, x, y) {
         const sprite = this._getSprite(timestamp);
@@ -140,14 +142,11 @@ class Skeleton {
         ctx.drawImage(sprite, x, y, w, h);
     }
     _getSprite(timestamp) {
-        if (this.progress) {
-            return SPRITES.skeleton.sleep[2];
-        }
         switch (this.state) {
             case 'sleep':
-                return SPRITES.skeleton.sleep[0];
+                return SPRITES.skeleton.sleep[this.progress];
             case 'dead':
-                return SPRITES.skeleton.sleep[1];             
+                return SPRITES.skeleton.dead[this.progress];
             case 'wake':
                 const quarter = Math.floor((timestamp % (SETTINGS.moveTimeMs * 4)) / SETTINGS.moveTimeMs);
                 const idx =
@@ -301,8 +300,8 @@ class Maze {
                 skeleton.progress = true;
                 SOUND.skeleton.dead.play();
             }
-            if (moveProgress > 1) {
-                skeleton.progress = false;
+            if (skeleton.state === 'dead' && skeleton.progress < 2 ) {
+                skeleton.progress = moveProgress < 0.5 ? 1 : 2;
             }
         }
         for (const [di, dj] of [[1, 0], [0, 1], [-1, 0], [0, -1]]) {
@@ -313,12 +312,16 @@ class Maze {
             if (this.items[i2][j2] instanceof Skeleton) {
                 const skeleton = this.items[i2][j2];
                 if (skeleton.state === 'sleep') {
-                    skeleton.state = 'wake';
-                    skeleton.progress = true;
+                    skeleton.progress = 1;
                     SOUND.skeleton.wake.play();
                 }
-                if (moveProgress > 1) {
-                    skeleton.progress = false;
+                if (skeleton.state === 'sleep') {
+                    if (skeleton.progress === 1 && moveProgress > 0.5) {
+                        skeleton.progress = 2;
+                    }
+                    if (skeleton.progress === 2 && moveProgress > 1) {
+                        skeleton.state = 'wake';
+                    }
                 }
             }
         }
