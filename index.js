@@ -8,6 +8,7 @@ const SETTINGS = {
     playerColor: '#ff3300',
     moveTimeMs: 500, 
     spriteTimeMs: 100,
+    fightTimeMs: 300,
     wanderTimeMs: [2000, 5000],
 };
 
@@ -42,6 +43,12 @@ SPRITES.player = {
         ArrowLeft: loadSprites('img/left-move1.svg', 'img/left-move2.svg', 'img/left-move3.svg', 'img/left-move2.svg'),
         ArrowUp: loadSprites('img/up-move1.svg', 'img/up-move3.svg'),
         ArrowRight: loadSprites('img/right-move1.svg', 'img/right-move2.svg', 'img/right-move3.svg', 'img/right-move2.svg'),
+    },
+    fight: {
+        ArrowDown: loadSprites('img/down-fight1.svg', 'img/down-fight2.svg', 'img/down-fight1.svg'),
+        ArrowLeft: loadSprites('img/left-fight1.svg', 'img/left-fight2.svg', 'img/left-fight1.svg'),
+        ArrowUp: loadSprites('img/up-fight1.svg', 'img/up-fight2.svg', 'img/up-fight1.svg'),
+        ArrowRight: loadSprites('img/right-fight1.svg', 'img/right-fight2.svg', 'img/right-fight1.svg'),
     },
     win: loadSprites('img/down-stand.svg', 'img/down-cheer.svg')
 }
@@ -210,6 +217,12 @@ function initECS(maze, viewport) {
 
     ecs.addComponent('player', {});
 
+    ecs.addComponent('fight', {
+        startTimestamp: null,
+        progress: 0,
+        sprites: [],
+    });
+
     // Update move progress
     ecs.addSystem(['move'], function(move, timestamp) {
         if (!move.startTimestamp) {
@@ -219,12 +232,26 @@ function initECS(maze, viewport) {
     });    
 
     // Read pressed keys and start moving player
-    ecs.addSystem(['player', 'pos', 'move'], function(player, pos, move, timestamp, entity) {
+    ecs.addSystem(['player', 'fight', 'pos', 'move'], function(player, fight, pos, move, timestamp, entity) {
         STATE.playerMove = {};
         if (move.progress > 0 && move.progress < 1) {
             return;
         }
+        if (fight.startTimestamp) {
+            return;
+        }
         for (const direction of Object.keys(STATE.pressedKeys)) {
+            if (direction === ' ') {
+                if (move.startTimestamp) {
+                    continue;
+                }
+                fight.startTimestamp = timestamp;
+                const coords = maze.canMove(pos.i, pos.j, move.direction, true);
+                if (coords) {
+                    STATE.playerMove.fight = coords;
+                }
+                return;
+            }
             move.direction = direction;
             const coords = maze.canMove(pos.i, pos.j, direction);
             if (!coords) {
@@ -270,6 +297,18 @@ function initECS(maze, viewport) {
             STATE.win = true;
         } else {
             playSound(SOUND.treasure);
+        }
+    });
+
+    // Update wake progress
+    ecs.addSystem(['fight'], function(fight, timestamp) {
+        if (!fight.startTimestamp) {
+            return;
+        }
+        fight.progress = (timestamp - fight.startTimestamp) / SETTINGS.fightTimeMs;
+        if (fight.progress >= 1) {
+            fight.startTimestamp = null;
+            fight.progress = 0;
         }
     });
 
@@ -344,16 +383,17 @@ function initECS(maze, viewport) {
 
     // Kill mobs
     ecs.addSystem(['die', 'pos'], function(die, pos, timestamp, entity) {
-        if (!STATE.playerMove.started) {
+        if (!STATE.playerMove.fight) {
             return;
         }
-        const [pi, pj] = STATE.playerMove.started;
+        const [pi, pj] = STATE.playerMove.fight;
         if (pos.i !== pi || pos.j !== pj) {
             return;
         }
         entity.removeComponent('move');        
         entity.removeComponent('idle');
         entity.removeComponent('wander');
+        pos.blocks = false;
         playSound(die.sound);
         die.startTimestamp = timestamp;
     });
@@ -408,6 +448,16 @@ function initECS(maze, viewport) {
         }
     });
 
+    // Update fight sprite
+    ecs.addSystem(['fight', 'move', 'draw'], function(fight, move, draw, timestamp) {
+        if (!fight.startTimestamp) {
+            return;
+        }
+        const sprites = Array.isArray(fight.sprites) ? fight.sprites : fight.sprites[move.direction];
+        const spriteIdx = Math.floor(sprites.length * fight.progress);
+        draw.sprite = sprites[spriteIdx];
+    });
+
     // Update idle sprite
     ecs.addSystem(['idle', 'draw'], function(idle, draw, timestamp) {
         const spriteIdx = Math.floor((timestamp % (SETTINGS.moveTimeMs * idle.sprites.length)) / SETTINGS.moveTimeMs);
@@ -454,7 +504,10 @@ function Player(i, j) {
             moveSprites: SPRITES.player.move,
         },
         draw: {zIdx: 10},
-        player: {}
+        player: {},
+        fight: {
+            sprites: SPRITES.player.fight,
+        },
     };
 }
 
@@ -484,7 +537,7 @@ function Pot(i, j) {
 
 function Skeleton(i, j) {
     return {
-        pos: {i, j, blocks: false},
+        pos: {i, j, blocks: true},
         wake: {
             sound: SOUND.skeleton.wake,
             sprites: SPRITES.skeleton.sleep,
@@ -539,16 +592,16 @@ class Maze {
             this.verWalls[i][this.width] = true;
         }
     }
-    canMove(i, j, direction) {
+    canMove(i, j, direction, ignoreBlocked) {
         switch (direction) {
             case 'ArrowDown':
-                return !this.horWalls[i + 1][j] && !this.isBlocked(i + 1, j) ? [i + 1, j] : null;
+                return !this.horWalls[i + 1][j] && (ignoreBlocked || !this.isBlocked(i + 1, j) )? [i + 1, j] : null;
             case 'ArrowLeft':
-                return !this.verWalls[i][j] && !this.isBlocked(i, j - 1) ? [i, j - 1] : null;
+                return !this.verWalls[i][j] && (ignoreBlocked || !this.isBlocked(i, j - 1)) ? [i, j - 1] : null;
             case 'ArrowUp':
-                return !this.horWalls[i][j] && !this.isBlocked(i - 1, j) ? [i - 1, j] : null;
+                return !this.horWalls[i][j] && (ignoreBlocked || !this.isBlocked(i - 1, j)) ? [i - 1, j] : null;
             case 'ArrowRight':
-                return !this.verWalls[i][j + 1] && !this.isBlocked(i, j + 1) ? [i, j + 1] : null;
+                return !this.verWalls[i][j + 1] && (ignoreBlocked || !this.isBlocked(i, j + 1)) ? [i, j + 1] : null;
             default:
                 return null;
         }
@@ -840,12 +893,11 @@ function play() {
             case 'ArrowUp':
             case 'ArrowDown':
                 break;
-            case 'Enter':
             case ' ':
                 if (STATE.win) {
                     reset();
                 }
-                return;
+                break;
             case 'Escape':
                 reset();
                 return;
