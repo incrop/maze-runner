@@ -7,7 +7,8 @@ const SETTINGS = {
     wallColor: '#ffdb4d',
     playerColor: '#ff3300',
     moveTimeMs: 500, 
-    spriteTimeMs: 100, 
+    spriteTimeMs: 100,
+    wanderTimeMs: [2000, 5000],
 };
 
 const STATE = {
@@ -53,7 +54,18 @@ SPRITES.treasure = {
 };
 SPRITES.skeleton = {
     sleep: loadSprites('img/skeleton-appear1.svg', 'img/skeleton-appear2.svg', 'img/skeleton-down-stand.svg'),
-    wake: loadSprites('img/skeleton-dance1.svg', 'img/skeleton-dance2.svg', 'img/skeleton-dance3.svg', 'img/skeleton-dance2.svg'),
+    idle: {
+        ArrowDown: loadSprites('img/skeleton-down-stand.svg', 'img/skeleton-dance1.svg', 'img/skeleton-dance2.svg', 'img/skeleton-dance3.svg', 'img/skeleton-dance2.svg'),
+        ArrowLeft: loadSprites('img/skeleton-left-stand.svg'),
+        ArrowUp: loadSprites('img/skeleton-up-stand.svg'),
+        ArrowRight: loadSprites('img/skeleton-right-stand.svg'),
+    },
+    move: {
+        ArrowDown: loadSprites('img/skeleton-down-move1.svg', 'img/skeleton-down-move2.svg', 'img/skeleton-down-move3.svg', 'img/skeleton-down-move2.svg'),
+        ArrowLeft: loadSprites('img/skeleton-left-move1.svg', 'img/skeleton-left-move2.svg', 'img/skeleton-left-move3.svg', 'img/skeleton-left-move2.svg'),
+        ArrowUp: loadSprites('img/skeleton-up-move1.svg', 'img/skeleton-up-move2.svg', 'img/skeleton-up-move3.svg', 'img/skeleton-up-move2.svg'),
+        ArrowRight: loadSprites('img/skeleton-right-move1.svg', 'img/skeleton-right-move2.svg', 'img/skeleton-right-move3.svg', 'img/skeleton-right-move2.svg'),
+    },
     die: loadSprites('img/skeleton-die1.svg', 'img/skeleton-die2.svg'),
     dead: loadSprites('img/skeleton-die3.svg'),
 }
@@ -79,6 +91,14 @@ function playSound(sound) {
     } else {
         sound.currentTime = 0;
     }
+}
+
+function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
 }
 
 class ECS {
@@ -167,6 +187,10 @@ function initECS(maze, viewport) {
         progress: 0,
         sprites: [],
         onWake: ['none', {}],
+    });
+
+    ecs.addComponent('wander', {
+        startTimestamp: null,
     });
 
     ecs.addComponent('die', {
@@ -283,6 +307,39 @@ function initECS(maze, viewport) {
             entity.removeComponent('wake');
             entity.addComponent(wake.onWake[0], wake.onWake[1]);
         }
+    });
+
+    // Start wandering
+    ecs.addSystem(['wander', 'pos', 'move'], function(wander, pos, move, timestamp, entity) {
+        if (!wander.startTimestamp) {
+            wander.startTimestamp = timestamp + SETTINGS.wanderTimeMs[0] + Math.random() * (SETTINGS.wanderTimeMs[1] - SETTINGS.wanderTimeMs[0]);
+        }
+        if (move.progress >= 1) {
+            move.startTimestamp = null;
+            move.progress = 0;
+        }
+        if (wander.startTimestamp > timestamp) {
+            return;
+        }
+        for (const direction of shuffle(['ArrowDown', 'ArrowLeft', 'ArrowUp', 'ArrowRight'])) {
+            const coords = maze.canMove(pos.i, pos.j, direction);
+            if (!coords) {
+                continue;
+            }
+            const [i, j] = coords;
+            if (maze.items[i][j].length > 0) {
+                continue;
+            }
+            move.startTimestamp = wander.startTimestamp;
+            move.progress = 0;
+            move.direction = direction;
+            wander.startTimestamp = null;
+            maze.remove(entity);
+            [pos.i, pos.j] = coords;
+            maze.add(entity)
+            return;
+        }
+        wander.startTimestamp = null;
     });
 
     // Kill mobs
@@ -431,8 +488,15 @@ function Skeleton(i, j) {
             sound: SOUND.skeleton.wake,
             sprites: SPRITES.skeleton.sleep,
             respectWalls: false,
-            onWake: ['idle', {sprites: SPRITES.skeleton.wake}],
+            onWake: ['move', {
+                direction: 'ArrowDown',
+                startTimestamp: null,
+                progress: 0,
+                moveSprites: SPRITES.skeleton.move,
+                idleSprites: SPRITES.skeleton.idle,
+            }],
         },
+        wander: {},
         die: {
             sound: SOUND.skeleton.die,
             sprites: SPRITES.skeleton.die,
@@ -568,7 +632,7 @@ function generateDFS(maze, ecs) {
     
     function generateStep(i, j) {
         visited[i][j] = true;
-        for (const dir of shuffleDir()) {
+        for (const dir of shuffle(['u', 'l', 'r', 'd'])) {
             switch (dir) {
                 case 'u':
                     if (i > 0 && !visited[i - 1][j]) {
