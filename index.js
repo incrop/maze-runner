@@ -353,6 +353,7 @@ function initECS(maze, viewport) {
         }
         entity.removeComponent('move');        
         entity.removeComponent('idle');
+        entity.removeComponent('wander');
         playSound(die.sound);
         die.startTimestamp = timestamp;
     });
