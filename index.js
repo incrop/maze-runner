@@ -93,6 +93,9 @@ const SOUND = {
 };
 
 function playSound(sound) {
+    if (!sound) {
+        return;
+    }
     if (sound.paused) {
         sound.play();
     } else {
@@ -193,7 +196,7 @@ function initECS(maze, viewport) {
         startTimestamp: null,
         progress: 0,
         sprites: [],
-        onWake: ['none', {}],
+        onWake: {},
     });
 
     ecs.addComponent('wander', {
@@ -204,7 +207,7 @@ function initECS(maze, viewport) {
         sound: null,
         progress: 0,
         sprites: [],
-        onDie: ['none', {}],
+        onDie: {},
     });
 
     ecs.addComponent('draw', {
@@ -344,7 +347,9 @@ function initECS(maze, viewport) {
         wake.progress = (timestamp - wake.startTimestamp) / SETTINGS.moveTimeMs;
         if (wake.progress >= 1) {
             entity.removeComponent('wake');
-            entity.addComponent(wake.onWake[0], wake.onWake[1]);
+            for (const [name, component] of Object.entries(wake.onWake)) {
+                entity.addComponent(name, component);
+            }
         }
     });
 
@@ -406,7 +411,9 @@ function initECS(maze, viewport) {
         die.progress = (timestamp - die.startTimestamp) / SETTINGS.moveTimeMs;
         if (die.progress >= 1) {
             entity.removeComponent('die');
-            entity.addComponent(die.onDie[0], die.onDie[1]);
+            for (const [name, component] of Object.entries(die.onDie)) {
+                entity.addComponent(name, component);
+            }
         }
     });
 
@@ -542,19 +549,23 @@ function Skeleton(i, j) {
             sound: SOUND.skeleton.wake,
             sprites: SPRITES.skeleton.sleep,
             respectWalls: false,
-            onWake: ['move', {
-                direction: 'ArrowDown',
-                startTimestamp: null,
-                progress: 0,
-                moveSprites: SPRITES.skeleton.move,
-                idleSprites: SPRITES.skeleton.idle,
-            }],
+            onWake: {
+                move: {
+                    direction: 'ArrowDown',
+                    startTimestamp: null,
+                    progress: 0,
+                    moveSprites: SPRITES.skeleton.move,
+                    idleSprites: SPRITES.skeleton.idle,
+                }
+            },
         },
         wander: {},
         die: {
             sound: SOUND.skeleton.die,
             sprites: SPRITES.skeleton.die,
-            onDie: ['idle', {sprites: SPRITES.skeleton.dead}],
+            onDie: {
+                idle: {sprites: SPRITES.skeleton.dead}
+            },
         },
         draw: {},
     };
@@ -567,7 +578,16 @@ function Ghost(i, j) {
             sound: SOUND.ghost,
             sprites: SPRITES.ghost.sleep,
             respectWalls: true,
-            onWake: ['idle', {sprites: SPRITES.ghost.wake}],
+            onWake: {
+                idle: {sprites: SPRITES.ghost.wake}
+            },
+        },
+        die: {
+            sprites: [...SPRITES.ghost.sleep].reverse(),
+            onDie: {
+                idle: {sprites: [SPRITES.ghost.sleep[0]]},
+                treasure: {},
+            },
         },
         draw: {},
     };
@@ -671,7 +691,7 @@ function generateDFS(maze, ecs) {
         }
     }
 
-    STATE.treasures = TREASURES + POTS;
+    STATE.treasures = TREASURES + POTS + GHOSTS;
     for (let i = 0; i < TREASURES; i++) {
         putAtRandom(Treasure);
     }
