@@ -414,6 +414,9 @@ function initECS(maze, viewport) {
         if (!STATE.playerMove.fight) {
             return;
         }
+        if (die.startTimestamp) {
+            return;
+        }
         const [pi, pj] = STATE.playerMove.fight;
         if (pos.i !== pi || pos.j !== pj) {
             return;
