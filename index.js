@@ -367,7 +367,7 @@ function initECS(maze, viewport) {
             const di = pos.i - pi;
             const dj = pos.j - pj;
             if (Math.abs(di) + Math.abs(dj) > 1) {
-                return;
+                continue;
             }
             if (wake.respectWalls) {
                 if (
@@ -375,7 +375,7 @@ function initECS(maze, viewport) {
                     (di === -1 && maze.horWalls[pos.i + 1][pos.j]) ||
                     (dj === 1 && maze.verWalls[pos.i][pos.j]) ||
                     (dj === -1 && maze.verWalls[pos.i][pos.j + 1])) {
-                    return;
+                    continue;
                 } 
             }
             playSound(wake.sound);
@@ -441,7 +441,7 @@ function initECS(maze, viewport) {
             }
             const [pi, pj] = STATE[playerName].playerMove.fight;
             if (pos.i !== pi || pos.j !== pj) {
-                return;
+                continue;
             }
             entity.removeComponent('move');        
             entity.removeComponent('idle');
