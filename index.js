@@ -969,44 +969,45 @@ function play() {
     }
 
     function processKeyDown(e) {
+        let p1;
+        let p2;
+        if (PLAYER === 'both') {
+            p1 = STATE.finn;
+            p2 = STATE.jake;
+        } else {
+            p1 = STATE[PLAYER];
+            p2 = STATE[PLAYER];
+        }
         switch (e.key) {
             case 'ArrowLeft':
             case 'ArrowRight':
             case 'ArrowUp':
             case 'ArrowDown':
-                STATE.finn.pressedKeys[e.key] = true;
+                p1.pressedKeys[e.key] = true;
                 break;
             case 'a':
-                STATE.jake.pressedKeys.ArrowLeft = true;
+                p2.pressedKeys.ArrowLeft = true;
                 break;
             case 'd':
-                STATE.jake.pressedKeys.ArrowRight = true;
+                p2.pressedKeys.ArrowRight = true;
                 break;
             case 'w':
-                STATE.jake.pressedKeys.ArrowUp = true;
+                p2.pressedKeys.ArrowUp = true;
                 break;
             case 's':
-                STATE.jake.pressedKeys.ArrowDown = true;
+                p2.pressedKeys.ArrowDown = true;
                 break;
             case ' ':
                 if (STATE.win) {
                     reset();
                 }
-                if (PLAYER === 'both') {
-                    STATE.jake.pressedKeys.Enter = true;
-                } else {
-                    STATE[PLAYER].pressedKeys.Enter = true;
-                }
+                p2.pressedKeys.Enter = true;
                 break;
             case 'Enter':
                 if (STATE.win) {
                     reset();
                 }
-                if (PLAYER === 'both') {
-                    STATE.finn.pressedKeys.Enter = true;
-                } else {
-                    STATE[PLAYER].pressedKeys.Enter = true;
-                }
+                p1.pressedKeys.Enter = true;
                 break;
             case 'Escape':
                 reset();
@@ -1017,38 +1018,39 @@ function play() {
     }
 
     function processKeyUp(e) {
+        let p1;
+        let p2;
+        if (PLAYER === 'both') {
+            p1 = STATE.finn;
+            p2 = STATE.jake;
+        } else {
+            p1 = STATE[PLAYER];
+            p2 = STATE[PLAYER];
+        }
         switch (e.key) {
             case 'ArrowLeft':
             case 'ArrowRight':
             case 'ArrowUp':
             case 'ArrowDown':
-                delete STATE.finn.pressedKeys[e.key];
+                delete p1.pressedKeys[e.key];
                 break;
             case 'a':
-                delete STATE.jake.pressedKeys.ArrowLeft;
+                delete p2.pressedKeys.ArrowLeft;
                 break;
             case 'd':
-                delete STATE.jake.pressedKeys.ArrowRight;
+                delete p2.pressedKeys.ArrowRight;
                 break;
             case 'w':
-                delete STATE.jake.pressedKeys.ArrowUp;
+                delete p2.pressedKeys.ArrowUp;
                 break;
             case 's':
-                delete STATE.jake.pressedKeys.ArrowDown;
+                delete p2.pressedKeys.ArrowDown;
                 break;
             case ' ':
-                if (PLAYER === 'both') {
-                    delete STATE.jake.pressedKeys.Enter;
-                } else {
-                    delete STATE[PLAYER].pressedKeys.Enter;
-                }
+                delete p2.pressedKeys.Enter;
                 break;
             case 'Enter':
-                if (PLAYER === 'both') {
-                    delete STATE.finn.pressedKeys.Enter;
-                } else {
-                    delete STATE[PLAYER].pressedKeys.Enter;
-                }
+                delete p1.pressedKeys.Enter
                 break;
            }
     }
