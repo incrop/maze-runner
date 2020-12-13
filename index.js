@@ -20,38 +20,61 @@ const STATE = {
 }
 
 const params = new URLSearchParams(window.location.search);
-const WIDTH = parseInt(params.get('w') || 13, 10);
-const HEIGHT = parseInt(params.get('h') || 6, 10);
-const TREASURES = parseInt(params.get('t') || 8, 10);
-const SKELETONS = parseInt(params.get('s') || 2, 10);
-const POTS = parseInt(params.get('p') || 4, 10);
-const GHOSTS = parseInt(params.get('g') || 2, 10);
-const EDIT_MODE = !!params.get('e');
+const WIDTH = parseInt(params.get('width') || 13, 10);
+const HEIGHT = parseInt(params.get('height') || 6, 10);
+const TREASURES = parseInt(params.get('treasures') || 8, 10);
+const SKELETONS = parseInt(params.get('skeletons') || 2, 10);
+const POTS = parseInt(params.get('pots') || 4, 10);
+const GHOSTS = parseInt(params.get('ghosts') || 2, 10);
+const EDIT_MODE = !!params.get('edit');
+const PLAYER = params.get('player') || 'finn';
 
 const SPRITES = {
     onload: play
 };
-SPRITES.player = {
+SPRITES.finn = {
     idle: {
-        ArrowDown: loadSprites('img/down-stand.svg'),
-        ArrowLeft: loadSprites('img/left-stand.svg'),
-        ArrowUp: loadSprites('img/up-stand.svg'),
-        ArrowRight: loadSprites('img/right-stand.svg'),
+        ArrowDown: loadSprites('img/finn-down-stand.svg'),
+        ArrowLeft: loadSprites('img/finn-left-stand.svg'),
+        ArrowUp: loadSprites('img/finn-up-stand.svg'),
+        ArrowRight: loadSprites('img/finn-right-stand.svg'),
     },
     move: {
-        ArrowDown: loadSprites('img/down-move1.svg', 'img/down-move3.svg'),
-        ArrowLeft: loadSprites('img/left-move1.svg', 'img/left-move2.svg', 'img/left-move3.svg', 'img/left-move2.svg'),
-        ArrowUp: loadSprites('img/up-move1.svg', 'img/up-move3.svg'),
-        ArrowRight: loadSprites('img/right-move1.svg', 'img/right-move2.svg', 'img/right-move3.svg', 'img/right-move2.svg'),
+        ArrowDown: loadSprites('img/finn-down-move1.svg', 'img/finn-down-move3.svg'),
+        ArrowLeft: loadSprites('img/finn-left-move1.svg', 'img/finn-left-move2.svg', 'img/finn-left-move3.svg', 'img/finn-left-move2.svg'),
+        ArrowUp: loadSprites('img/finn-up-move1.svg', 'img/finn-up-move3.svg'),
+        ArrowRight: loadSprites('img/finn-right-move1.svg', 'img/finn-right-move2.svg', 'img/finn-right-move3.svg', 'img/finn-right-move2.svg'),
     },
     fight: {
-        ArrowDown: loadSprites('img/down-fight1.svg', 'img/down-fight2.svg', 'img/down-fight1.svg'),
-        ArrowLeft: loadSprites('img/left-fight1.svg', 'img/left-fight2.svg', 'img/left-fight1.svg'),
-        ArrowUp: loadSprites('img/up-fight1.svg', 'img/up-fight2.svg', 'img/up-fight1.svg'),
-        ArrowRight: loadSprites('img/right-fight1.svg', 'img/right-fight2.svg', 'img/right-fight1.svg'),
+        ArrowDown: loadSprites('img/finn-down-fight1.svg', 'img/finn-down-fight2.svg', 'img/finn-down-fight1.svg'),
+        ArrowLeft: loadSprites('img/finn-left-fight1.svg', 'img/finn-left-fight2.svg', 'img/finn-left-fight1.svg'),
+        ArrowUp: loadSprites('img/finn-up-fight1.svg', 'img/finn-up-fight2.svg', 'img/finn-up-fight1.svg'),
+        ArrowRight: loadSprites('img/finn-right-fight1.svg', 'img/finn-right-fight2.svg', 'img/finn-right-fight1.svg'),
     },
-    win: loadSprites('img/down-stand.svg', 'img/down-cheer.svg')
-}
+    win: loadSprites('img/finn-down-stand.svg', 'img/finn-down-cheer.svg')
+};
+SPRITES.jake = {
+    idle: {
+        ArrowDown: loadSprites('img/jake-down-stand.svg'),
+        ArrowLeft: loadSprites('img/jake-left-stand.svg'),
+        ArrowUp: loadSprites('img/jake-up-stand.svg'),
+        ArrowRight: loadSprites('img/jake-right-stand.svg'),
+    },
+    move: {
+        ArrowDown: loadSprites('img/jake-down-move1.svg', 'img/jake-down-move3.svg'),
+        ArrowLeft: loadSprites('img/jake-left-move1.svg', 'img/jake-left-move2.svg', 'img/jake-left-move3.svg', 'img/jake-left-move2.svg'),
+        ArrowUp: loadSprites('img/jake-up-move1.svg', 'img/jake-up-move3.svg'),
+        ArrowRight: loadSprites('img/jake-right-move1.svg', 'img/jake-right-move2.svg', 'img/jake-right-move3.svg', 'img/jake-right-move2.svg'),
+    },
+    fight: {
+        ArrowDown: loadSprites('img/jake-down-fight1.svg', 'img/jake-down-fight2.svg', 'img/jake-down-fight1.svg'),
+        ArrowLeft: loadSprites('img/jake-left-fight1.svg', 'img/jake-left-fight2.svg', 'img/jake-left-fight1.svg'),
+        ArrowUp: loadSprites('img/jake-up-fight1.svg', 'img/jake-up-fight2.svg', 'img/jake-up-fight1.svg'),
+        ArrowRight: loadSprites('img/jake-right-fight1.svg', 'img/jake-right-fight2.svg', 'img/jake-right-fight1.svg'),
+    },
+    win: loadSprites('img/jake-down-stand.svg', 'img/jake-down-cheer1.svg', 'img/jake-down-stand.svg', 'img/jake-down-cheer2.svg')
+};
+SPRITES.player = PLAYER === 'jake' ? SPRITES.jake : SPRITES.finn;
 SPRITES.treasure = {
     chest: loadSprites('img/chest1-1.svg', 'img/chest1-2.svg', 'img/chest1-3.svg', 'img/chest1-4.svg'),
     gem1: loadSprites('img/gem1-1.svg', 'img/gem1-2.svg', 'img/gem1-3.svg', 'img/gem1-4.svg'),
