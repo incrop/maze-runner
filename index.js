@@ -13,9 +13,15 @@ const SETTINGS = {
 };
 
 const STATE = {
-    pressedKeys: {},
+    finn: {
+        pressedKeys: {},
+        playerMove: {},
+    },
+    jake: {
+        pressedKeys: {},
+        playerMove: {},
+    },
     treasures: 0,
-    playerMove: {},
     win: false,
 }
 
@@ -74,7 +80,6 @@ SPRITES.jake = {
     },
     win: loadSprites('img/jake-down-stand.svg', 'img/jake-down-cheer1.svg', 'img/jake-down-stand.svg', 'img/jake-down-cheer2.svg')
 };
-SPRITES.player = PLAYER === 'jake' ? SPRITES.jake : SPRITES.finn;
 SPRITES.treasure = {
     chest: loadSprites('img/chest1-1.svg', 'img/chest1-2.svg', 'img/chest1-3.svg', 'img/chest1-4.svg'),
     gem1: loadSprites('img/gem1-1.svg', 'img/gem1-2.svg', 'img/gem1-3.svg', 'img/gem1-4.svg'),
@@ -241,7 +246,9 @@ function initECS(maze, viewport) {
         zIdx: 0,
     });
 
-    ecs.addComponent('player', {});
+    ecs.addComponent('player', {
+        name: 'finn',
+    });
 
     ecs.addComponent('fight', {
         startTimestamp: null,
@@ -259,22 +266,23 @@ function initECS(maze, viewport) {
 
     // Read pressed keys and start moving player
     ecs.addSystem(['player', 'fight', 'pos', 'move'], function(player, fight, pos, move, timestamp, entity) {
-        STATE.playerMove = {};
+        const playerMove = {};
+        STATE[player.name].playerMove = playerMove;
         if (move.progress > 0 && move.progress < 1) {
             return;
         }
         if (fight.startTimestamp) {
             return;
         }
-        for (const direction of Object.keys(STATE.pressedKeys)) {
-            if (direction === ' ') {
+        for (const direction of Object.keys(STATE[player.name].pressedKeys)) {
+            if (direction === 'Enter') {
                 if (move.startTimestamp) {
                     continue;
                 }
                 fight.startTimestamp = timestamp;
                 const coords = maze.canMove(pos.i, pos.j, move.direction, true);
                 if (coords) {
-                    STATE.playerMove.fight = coords;
+                    playerMove.fight = coords;
                 }
                 return;
             }
@@ -283,9 +291,9 @@ function initECS(maze, viewport) {
             if (!coords) {
                 continue;
             }
-            STATE.playerMove.started = coords;
+            playerMove.started = coords;
             if (move.startTimestamp) {
-                STATE.playerMove.finished = [pos.i, pos.j];
+                playerMove.finished = [pos.i, pos.j];
                 move.startTimestamp += SETTINGS.moveTimeMs;
                 move.progress -= 1;
             } else {
@@ -298,18 +306,18 @@ function initECS(maze, viewport) {
             return;
         }
         if (move.progress >= 1) {
-            STATE.playerMove.finished = [pos.i, pos.j];
+            playerMove.finished = [pos.i, pos.j];
             move.startTimestamp = null;
             move.progress = 0;
         }
     });
 
     // Collect treasures
-    ecs.addSystem(['player', 'pos', 'move'], function(player, pos, move) {
-        if (!STATE.playerMove.finished) {
+    ecs.addSystem(['player', 'move'], function(player, move) {
+        if (!STATE[player.name].playerMove.finished) {
             return;
         }
-        const [i, j] = STATE.playerMove.finished;
+        const [i, j] = STATE[player.name].playerMove.finished;
         const treasure = maze.items[i][j].find(item => item.treasure);
         if (!treasure) {
             return;
@@ -319,11 +327,19 @@ function initECS(maze, viewport) {
         if (--STATE.treasures === 0) {
             SOUND.background.pause();
             playSound(SOUND.win);
-            move.idleSprites = SPRITES.player.win;
+            
             STATE.win = true;
         } else {
             playSound(SOUND.treasure);
         }
+    });
+
+    // Update win sprites
+    ecs.addSystem(['player', 'move'], function(player, move) {
+        if (!STATE.win) {
+            return;
+        }
+        move.idleSprites = SPRITES[player.name].win;
     });
 
     // Update wake progress
@@ -340,26 +356,31 @@ function initECS(maze, viewport) {
 
     // Wake mobs
     ecs.addSystem(['wake', 'pos'], function(wake, pos, timestamp) {
-        if (!STATE.playerMove.started || wake.startTimestamp) {
+        if (wake.startTimestamp) {
             return;
         }
-        const [pi, pj] = STATE.playerMove.started;
-        const di = pos.i - pi;
-        const dj = pos.j - pj;
-        if (Math.abs(di) + Math.abs(dj) > 1) {
-            return;
-        }
-        if (wake.respectWalls) {
-            if (
-                (di === 1 && maze.horWalls[pos.i][pos.j]) ||
-                (di === -1 && maze.horWalls[pos.i + 1][pos.j]) ||
-                (dj === 1 && maze.verWalls[pos.i][pos.j]) ||
-                (dj === -1 && maze.verWalls[pos.i][pos.j + 1])) {
+        for (const playerName of ['finn', 'jake']) {
+            if (!STATE[playerName].playerMove.started) {
+                continue;
+            }
+            const [pi, pj] = STATE[playerName].playerMove.started;
+            const di = pos.i - pi;
+            const dj = pos.j - pj;
+            if (Math.abs(di) + Math.abs(dj) > 1) {
                 return;
-            } 
+            }
+            if (wake.respectWalls) {
+                if (
+                    (di === 1 && maze.horWalls[pos.i][pos.j]) ||
+                    (di === -1 && maze.horWalls[pos.i + 1][pos.j]) ||
+                    (dj === 1 && maze.verWalls[pos.i][pos.j]) ||
+                    (dj === -1 && maze.verWalls[pos.i][pos.j + 1])) {
+                    return;
+                } 
+            }
+            playSound(wake.sound);
+            wake.startTimestamp = timestamp;
         }
-        playSound(wake.sound);
-        wake.startTimestamp = timestamp;
     });
 
     // Update wake progress
@@ -411,22 +432,24 @@ function initECS(maze, viewport) {
 
     // Kill mobs
     ecs.addSystem(['die', 'pos'], function(die, pos, timestamp, entity) {
-        if (!STATE.playerMove.fight) {
-            return;
-        }
         if (die.startTimestamp) {
             return;
         }
-        const [pi, pj] = STATE.playerMove.fight;
-        if (pos.i !== pi || pos.j !== pj) {
-            return;
+        for (const playerName of ['finn', 'jake']) {
+            if (!STATE[playerName].playerMove.fight) {
+                continue;
+            }
+            const [pi, pj] = STATE[playerName].playerMove.fight;
+            if (pos.i !== pi || pos.j !== pj) {
+                return;
+            }
+            entity.removeComponent('move');        
+            entity.removeComponent('idle');
+            entity.removeComponent('wander');
+            pos.blocks = false;
+            playSound(die.sound);
+            die.startTimestamp = timestamp;
         }
-        entity.removeComponent('move');        
-        entity.removeComponent('idle');
-        entity.removeComponent('wander');
-        pos.blocks = false;
-        playSound(die.sound);
-        die.startTimestamp = timestamp;
     });
 
     // Update die progress
@@ -529,17 +552,19 @@ function initECS(maze, viewport) {
     return ecs;
 }
 
-function Player(i, j) {
+function Player(i, j, name) {
     return {
-        pos: {i, j},
+        pos: {i, j, blocks: true},
         move: {
-            idleSprites: SPRITES.player.idle,
-            moveSprites: SPRITES.player.move,
+            idleSprites: SPRITES[name].idle,
+            moveSprites: SPRITES[name].move,
         },
         draw: {zIdx: 10},
-        player: {},
+        player: {
+            name: name,
+        },
         fight: {
-            sprites: SPRITES.player.fight,
+            sprites: SPRITES[name].fight,
         },
     };
 }
@@ -773,7 +798,7 @@ function generateDFS(maze, ecs) {
         do {
             i = Math.floor(Math.random() * h);
             j = Math.floor(Math.random() * w);
-        } while ((i + j) <= 1 || maze.items[i][j].length || (extraCheck && !extraCheck(i, j)));
+        } while ((i + j) <= 1 || (i + j) >= (h + w - 3) || maze.items[i][j].length || (extraCheck && !extraCheck(i, j)));
         const entity = create(i, j);
         ecs.addEntity(entity);
         maze.add(entity);
@@ -917,7 +942,18 @@ function play() {
             generateDFS(maze, ecs);
         }
 
-        ecs.addEntity(Player(0, 0));
+        switch (PLAYER) {
+            case 'jake':
+                ecs.addEntity(Player(0, 0, 'jake'));
+                break;
+            case 'both':
+                ecs.addEntity(Player(0, 0, 'jake'));
+                ecs.addEntity(Player(maze.height - 1, maze.width - 1, 'finn'));
+                break;
+            default:
+                ecs.addEntity(Player(0, 0, 'finn'));
+                break;
+        }
 
         SOUND.background.loop = true;
         SOUND.background.play();
@@ -938,10 +974,38 @@ function play() {
             case 'ArrowRight':
             case 'ArrowUp':
             case 'ArrowDown':
+                STATE.finn.pressedKeys[e.key] = true;
+                break;
+            case 'a':
+                STATE.jake.pressedKeys.ArrowLeft = true;
+                break;
+            case 'd':
+                STATE.jake.pressedKeys.ArrowRight = true;
+                break;
+            case 'w':
+                STATE.jake.pressedKeys.ArrowUp = true;
+                break;
+            case 's':
+                STATE.jake.pressedKeys.ArrowDown = true;
                 break;
             case ' ':
                 if (STATE.win) {
                     reset();
+                }
+                if (PLAYER === 'both') {
+                    STATE.jake.pressedKeys.Enter = true;
+                } else {
+                    STATE[PLAYER].pressedKeys.Enter = true;
+                }
+                break;
+            case 'Enter':
+                if (STATE.win) {
+                    reset();
+                }
+                if (PLAYER === 'both') {
+                    STATE.finn.pressedKeys.Enter = true;
+                } else {
+                    STATE[PLAYER].pressedKeys.Enter = true;
                 }
                 break;
             case 'Escape':
@@ -950,11 +1014,43 @@ function play() {
             default:
                 return;
         }
-        STATE.pressedKeys[e.key] = true;
     }
 
     function processKeyUp(e) {
-        delete STATE.pressedKeys[e.key];
+        switch (e.key) {
+            case 'ArrowLeft':
+            case 'ArrowRight':
+            case 'ArrowUp':
+            case 'ArrowDown':
+                delete STATE.finn.pressedKeys[e.key];
+                break;
+            case 'a':
+                delete STATE.jake.pressedKeys.ArrowLeft;
+                break;
+            case 'd':
+                delete STATE.jake.pressedKeys.ArrowRight;
+                break;
+            case 'w':
+                delete STATE.jake.pressedKeys.ArrowUp;
+                break;
+            case 's':
+                delete STATE.jake.pressedKeys.ArrowDown;
+                break;
+            case ' ':
+                if (PLAYER === 'both') {
+                    delete STATE.jake.pressedKeys.Enter;
+                } else {
+                    delete STATE[PLAYER].pressedKeys.Enter;
+                }
+                break;
+            case 'Enter':
+                if (PLAYER === 'both') {
+                    delete STATE.finn.pressedKeys.Enter;
+                } else {
+                    delete STATE[PLAYER].pressedKeys.Enter;
+                }
+                break;
+           }
     }
 
     function processClick(e) {
