@@ -8,7 +8,7 @@ const SETTINGS = {
     playerColor: '#ff3300',
     moveTimeMs: 500, 
     spriteTimeMs: 100,
-    fightTimeMs: 300,
+    fightTimeMs: 500,
     wanderTimeMs: [2000, 5000],
 };
 
@@ -342,7 +342,7 @@ function initECS(maze, viewport) {
         move.idleSprites = SPRITES[player.name].win;
     });
 
-    // Update wake progress
+    // Update fight progress
     ecs.addSystem(['fight'], function(fight, timestamp) {
         if (!fight.startTimestamp) {
             return;
